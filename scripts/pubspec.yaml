@@ -1,0 +1,9 @@
+name: correction_script
+description: A one-time script to fix Firestore data.
+environment:
+  sdk: '>=3.0.0 <4.0.0' # This is a robust constraint
+
+dependencies:
+  # These versions should match what's in your main pubspec.yaml
+  firebase_core: ^2.32.0
+  cloud_firestore: ^4.17.4

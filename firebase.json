@@ -1,0 +1,72 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "unmercato1",
+          "appId": "1:230443187002:android:59630676438381d771ae03",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "unmercato1",
+          "configurations": {
+            "android": "1:230443187002:android:59630676438381d771ae03",
+            "ios": "1:230443187002:ios:352ce130a5e9826571ae03",
+            "macos": "1:230443187002:ios:352ce130a5e9826571ae03",
+            "web": "1:230443187002:web:e9ad540e7ac9906d71ae03",
+            "windows": "1:230443187002:web:7425ad6a2f5f039471ae03"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "sparrow",
+      "codebase": "sparrow",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/(index.html|flutter_service_worker.js)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/assets/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      }
+    ]
+  }
+}
