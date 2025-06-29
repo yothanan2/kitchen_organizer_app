@@ -1,5 +1,5 @@
 // lib/dish_management_screen.dart
-// MODIFIED: Reworked the entire screen's logic based on the new workflow.
+// CORRECTED: Updated navigation to EditDishScreen to pass 'dishId' instead of 'dishDocument'.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,7 +17,6 @@ class DishManagementScreen extends StatefulWidget {
 class _DishManagementScreenState extends State<DishManagementScreen> {
   DishFilter _currentFilter = DishFilter.active;
 
-  // --- NEW: A dedicated function to toggle a dish's active status ---
   Future<void> _toggleActiveStatus(DocumentReference dishRef, bool currentStatus) async {
     try {
       await dishRef.update({'isActive': !currentStatus});
@@ -44,7 +43,8 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error deleting dish: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error deleting dish: $e"), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -133,11 +133,9 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
                     final category = data['category'] ?? 'No Category';
                     final bool isActive = data['isActive'] ?? true;
 
-                    // --- MODIFIED: The appearance of the tile changes based on the filter ---
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: ListTile(
-                        // The leading widget is now a Switch on the 'All Dishes' tab
                         leading: _currentFilter == DishFilter.all
                             ? Tooltip(
                           message: isActive ? 'Deactivate' : 'Activate',
@@ -155,19 +153,19 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
                           ),
                         ),
                         subtitle: Text(category),
-                        // Action buttons only show on 'All' and 'Components' tabs
                         trailing: (_currentFilter == DishFilter.all || _currentFilter == DishFilter.components)
                             ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishDocument: dishDoc)))),
+                            // UPDATED a parameter name here
+                            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishId: dishDoc.id)))),
                             IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _showDeleteConfirmation(dishDoc)),
                           ],
                         )
                             : null,
                         onTap: () {
-                          // Allow tapping to edit from any tab for convenience
-                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishDocument: dishDoc)));
+                          // UPDATED a parameter name here
+                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishId: dishDoc.id)));
                         },
                       ),
                     );
@@ -178,11 +176,9 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
           ),
         ],
       ),
-      // --- MODIFIED: FloatingActionButton logic is updated ---
       floatingActionButton: (_currentFilter == DishFilter.all || _currentFilter == DishFilter.components)
           ? FloatingActionButton(
         onPressed: () {
-          // Create a component if on the components tab, otherwise create a dish.
           final bool isCreatingComponent = _currentFilter == DishFilter.components;
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -193,7 +189,7 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
         tooltip: _currentFilter == DishFilter.components ? 'Add New Component' : 'Add New Dish',
         child: const Icon(Icons.add),
       )
-          : null, // Hide FAB on 'Active Dishes' tab
+          : null,
     );
   }
 }

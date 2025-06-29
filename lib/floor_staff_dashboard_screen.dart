@@ -1,5 +1,5 @@
 // lib/floor_staff_dashboard_screen.dart
-// CORRECTED: Updated to pass the current date to the daily note provider.
+// FINAL CORRECTION: Restored the correct navigation logic to the correct screen.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +9,9 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 
 import 'providers.dart';
-import 'floor_staff_confirmation_screen.dart';
+import 'floor_staff_confirmation_screen.dart'; // Correct import
+import 'widgets/weather_card_widget.dart';
+import 'widgets/daily_note_card_widget.dart';
 
 class FloorChecklistItem {
   final String id;
@@ -79,21 +81,6 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
     super.dispose();
   }
 
-  Color _getWeatherCardColor(String weatherDescription) {
-    String lowerCaseDesc = weatherDescription.toLowerCase();
-    if (lowerCaseDesc.contains('clear') || lowerCaseDesc.contains('sun')) return Colors.amber.shade100;
-    if (lowerCaseDesc.contains('cloudy') || lowerCaseDesc.contains('overcast')) return Colors.blueGrey.shade50;
-    if (lowerCaseDesc.contains('rain') || lowerCaseDesc.contains('drizzle') || lowerCaseDesc.contains('showers')) return Colors.lightBlue.shade100;
-    if (lowerCaseDesc.contains('snow')) return Colors.blue.shade50;
-    if (lowerCaseDesc.contains('thunderstorm')) return Colors.indigo.shade100;
-    if (lowerCaseDesc.contains('fog')) return Colors.grey.shade200;
-    return Colors.grey.shade100;
-  }
-
-  Color _getTextColor(Color backgroundColor) {
-    return backgroundColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
-  }
-
   void _setupTimeCheckTimer() {
     _timeCheckTimer?.cancel();
     final now = DateTime.now();
@@ -127,6 +114,7 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
     return DateTime.now().hour >= 22 && (tomorrowsItems.valueOrNull?.isEmpty ?? true);
   }
 
+  // --- THIS IS THE CORRECTED METHOD ---
   void _navigateToConfirmationScreen() async {
     final itemsToActuallyReport = _selectedForReportingIds.toSet();
     final alreadyReported = ref.read(tomorrowsFloorStaffPrepTasksProvider).value ?? {};
@@ -141,11 +129,13 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
 
     setState(() { _isSending = true; });
 
+    // The 'reportDate' is now used again.
     final reportDate = DateTime.now().add(const Duration(days: 1));
 
     try {
       await Navigator.of(context).push(
         MaterialPageRoute(
+          // Navigating to the correct screen with the correct parameters.
           builder: (context) => FloorStaffConfirmationScreen(
             selectedItemIds: itemsToActuallyReport,
             reportDate: reportDate,
@@ -169,7 +159,6 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
     final reporterDisplayName = appUser?.fullName?.split(' ').first ?? 'Staff';
     final tomorrowsReportedItemsAsync = ref.watch(tomorrowsFloorStaffPrepTasksProvider);
     final shouldBlink = _getShouldButtonBlink(tomorrowsReportedItemsAsync);
-    final weatherAsync = ref.watch(weatherProvider);
 
     final Animation<Color?> buttonBlinkColorAnimation = ColorTween(
       begin: Colors.red.shade700,
@@ -201,58 +190,9 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Column(
                   children: [
-                    weatherAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (err, stack) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Text('Weather Error: ${err.toString()}', style: const TextStyle(color: Colors.red)),
-                      ),
-                      data: (weather) {
-                        Color cardColor = _getWeatherCardColor(weather.dailyWeatherDescription);
-                        Color textColor = _getTextColor(cardColor);
-                        final precipitationInfo = weather.findFirstPrecipitation();
-
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeInOut,
-                          margin: const EdgeInsets.only(bottom: 16.0),
-                          padding: const EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), spreadRadius: 2, blurRadius: 5, offset: const Offset(0, 3))],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Current: ${weather.currentTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
-                                    Text('${weather.weatherIcon} ${weather.weatherDescription}', style: TextStyle(fontSize: 16, color: textColor)),
-                                    const SizedBox(height: 8),
-                                    Text('Today: ${weather.dailyWeatherIcon} ${weather.dailyWeatherDescription}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor)),
-                                    if (precipitationInfo != null) ...[
-                                      const SizedBox(height: 8),
-                                      Text('❗️ $precipitationInfo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor.withOpacity(0.9))),
-                                    ]
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('Max: ${weather.maxTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
-                                  Text('Min: ${weather.minTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const _AdminDailyNoteCard(),
+                    const WeatherCard(),
+                    const SizedBox(height: 16),
+                    const DailyNoteCard(noteFieldName: 'forFloorStaff'),
                     const _KitchenNoteCard(),
                     _PreviouslyReportedItemsCard(tomorrowsItems: tomorrowsReportedItemsAsync),
                     const Divider(height: 24, indent: 16, endIndent: 16),
@@ -304,61 +244,13 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
   }
 }
 
-class _AdminDailyNoteCard extends ConsumerWidget {
-  const _AdminDailyNoteCard();
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // UPDATED: Pass today's date string to the provider
-    final dateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final dailyDocAsync = ref.watch(dailyTodoListDocProvider(dateString));
-
-    return dailyDocAsync.when(
-      data: (doc) {
-        if (!doc.exists) return const SizedBox.shrink();
-        final data = doc.data() as Map<String, dynamic>;
-
-        final notesMap = data['dailyNotes'] as Map<String, dynamic>?;
-        final note = notesMap?['forFloorStaff'] as String?;
-
-        if (note == null || note.trim().isEmpty) return const SizedBox.shrink();
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16.0),
-          color: Colors.amber.shade100,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.speaker_notes, color: Colors.amber.shade800),
-                    const SizedBox(width: 8),
-                    Text("Admin Note for Today", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber.shade900)),
-                  ],
-                ),
-                const Divider(height: 16),
-                Text(note, style: const TextStyle(fontSize: 15)),
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (e,s) => const SizedBox.shrink(),
-    );
-  }
-}
-
 class _KitchenNoteCard extends ConsumerWidget {
   const _KitchenNoteCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // UPDATED: Pass today's date string to the provider
     final dateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final dailyDocAsync = ref.watch(dailyTodoListDocProvider(dateString));
-
     return dailyDocAsync.when(
       data: (doc) {
         if (!doc.exists) return const SizedBox.shrink();
