@@ -1,3 +1,6 @@
+// lib/units_screen.dart
+// UPDATED: Implemented "Safe Delete" to prevent deleting a unit that is in use.
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -12,26 +15,21 @@ class _UnitsScreenState extends State<UnitsScreen> {
   final TextEditingController _unitController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Function to show a dialog for adding or editing a unit
   void _showUnitDialog({DocumentSnapshot? unitDocument}) {
     String originalName = '';
-    // If we are editing, pre-fill the text field
     if (unitDocument != null) {
-      // Safely access data, providing default if not a Map or 'name' is missing
       final data = unitDocument.data() as Map<String, dynamic>?;
       originalName = data?['name'] as String? ?? '';
       _unitController.text = originalName;
     } else {
-      // If adding, make sure the field is clear
       _unitController.clear();
     }
 
-    // Ensure dialog is shown only if context is still mounted
     if (!mounted) return;
 
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) { // Use a different context name for clarity
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(unitDocument == null ? 'Add New Unit' : 'Edit Unit'),
           content: TextField(
@@ -43,36 +41,31 @@ class _UnitsScreenState extends State<UnitsScreen> {
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(dialogContext).pop(); // Use dialogContext
+                Navigator.of(dialogContext).pop();
               },
             ),
             ElevatedButton(
               child: const Text('Save'),
-              onPressed: () async { // Make async for Firestore operations
+              onPressed: () async {
                 final unitName = _unitController.text.trim();
                 if (unitName.isNotEmpty) {
                   final collection = _firestore.collection('units');
                   try {
                     if (unitDocument == null) {
-                      // Add new unit
                       await collection.add({
                         'name': unitName,
                         'createdOn': FieldValue.serverTimestamp(),
                       });
                     } else {
-                      // Update existing unit
                       await collection.doc(unitDocument.id).update({'name': unitName});
                     }
-                    if (!mounted) return; // Check mount status AFTER async operation
-                    Navigator.of(dialogContext).pop(); // Close the dialog using dialogContext
+                    if (!mounted) return;
+                    Navigator.of(dialogContext).pop();
                   } catch (e) {
-                    // Handle potential errors (e.g., network issues, permissions)
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Error saving unit: ${e.toString()}')),
                     );
-                    // Optionally, you might not want to pop the dialog on error
-                    // or provide more specific error feedback.
                   }
                 }
               },
@@ -81,22 +74,47 @@ class _UnitsScreenState extends State<UnitsScreen> {
         );
       },
     ).then((_) {
-      // Clear the controller when the dialog is dismissed,
-      // regardless of how it was dismissed.
-      // This is good practice if the controller is reused.
       _unitController.clear();
     });
   }
 
-  // Function to show a confirmation dialog before deleting
+  // --- THIS IS THE MODIFIED FUNCTION ---
   Future<void> _showDeleteConfirmDialog(String docId, String unitName) async {
-    // Ensure dialog is shown only if context is still mounted
+    // 1. Create a reference to the document we might delete.
+    final unitRef = _firestore.collection('units').doc(docId);
+
+    // 2. Check if any inventory items are using this unit.
+    final linkedItemsQuery = await _firestore
+        .collection('inventoryItems')
+        .where('unit', isEqualTo: unitRef)
+        .limit(1)
+        .get();
+
     if (!mounted) return;
 
+    // 3. If items are linked, show an error dialog and stop.
+    if (linkedItemsQuery.docs.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cannot Delete Unit'),
+          content: Text('The unit "$unitName" cannot be deleted because it is currently in use by one or more inventory items. Please re-assign those items to another unit first.'),
+          actions: [
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      );
+      return; // Stop the function here
+    }
+
+    // 4. If no items are linked, proceed with the original confirmation dialog.
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // User must tap button!
-      builder: (BuildContext dialogContext) { // Use a different context name
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Confirm Deletion'),
           content: Text('Are you sure you want to delete "$unitName"?'),
@@ -104,17 +122,17 @@ class _UnitsScreenState extends State<UnitsScreen> {
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(dialogContext).pop(); // Use dialogContext
+                Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Delete'),
-              onPressed: () async { // Make async for Firestore operations
+              onPressed: () async {
                 try {
-                  await _firestore.collection('units').doc(docId).delete();
-                  if (!mounted) return; // Check mount status AFTER async operation
-                  Navigator.of(dialogContext).pop(); // Close the dialog using dialogContext
+                  await unitRef.delete();
+                  if (!mounted) return;
+                  Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('"$unitName" deleted successfully.')),
                   );
@@ -123,7 +141,6 @@ class _UnitsScreenState extends State<UnitsScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error deleting unit: ${e.toString()}')),
                   );
-                  // Optionally, pop the dialog even on error, or handle differently.
                   Navigator.of(dialogContext).pop();
                 }
               },
@@ -136,7 +153,7 @@ class _UnitsScreenState extends State<UnitsScreen> {
 
   @override
   void dispose() {
-    _unitController.dispose(); // Dispose the controller when the widget is removed
+    _unitController.dispose();
     super.dispose();
   }
 
@@ -150,7 +167,6 @@ class _UnitsScreenState extends State<UnitsScreen> {
         stream: _firestore.collection('units').orderBy('name').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            // Log the error for debugging
             debugPrint('Firestore Stream Error: ${snapshot.error}');
             return const Center(child: Text('Something went wrong. Please try again.'));
           }
@@ -176,7 +192,6 @@ class _UnitsScreenState extends State<UnitsScreen> {
             itemCount: units.length,
             itemBuilder: (context, index) {
               final unitDocument = units[index];
-              // Use a more robust way to get data and handle potential nulls or wrong types
               final data = unitDocument.data() as Map<String, dynamic>?;
               final unitName = data?['name'] as String? ?? 'Unnamed Unit';
 

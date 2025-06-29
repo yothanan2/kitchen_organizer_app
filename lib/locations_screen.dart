@@ -1,3 +1,6 @@
+// lib/locations_screen.dart
+// UPDATED: Implemented "Safe Delete" to prevent deleting a location that is in use.
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -12,7 +15,6 @@ class _LocationsScreenState extends State<LocationsScreen> {
   final TextEditingController _locationController = TextEditingController();
   final CollectionReference _locationsCollection = FirebaseFirestore.instance.collection('locations');
 
-  // Function to show a dialog for adding or editing a location
   void _showLocationDialog({DocumentSnapshot? locationDocument}) {
     if (locationDocument != null) {
       final data = locationDocument.data() as Map<String, dynamic>;
@@ -42,7 +44,6 @@ class _LocationsScreenState extends State<LocationsScreen> {
                 final locationName = _locationController.text.trim();
                 if (locationName.isEmpty) return;
 
-                // Fool-proof check to prevent duplicate location names
                 final querySnapshot = await _locationsCollection.where('name', isEqualTo: locationName).limit(1).get();
                 if (querySnapshot.docs.isNotEmpty && (locationDocument == null || querySnapshot.docs.first.id != locationDocument.id)) {
                   if (mounted) {
@@ -67,8 +68,39 @@ class _LocationsScreenState extends State<LocationsScreen> {
     );
   }
 
-  // Function to show a confirmation dialog before deleting
-  Future<void> _showDeleteConfirmDialog(BuildContext context, String docId, String locationName) async {
+  // --- THIS IS THE MODIFIED FUNCTION ---
+  Future<void> _showDeleteConfirmDialog(String docId, String locationName) async {
+    // 1. Create a reference to the document we might delete.
+    final locationRef = _locationsCollection.doc(docId);
+
+    // 2. Check if any inventory items are linked to this location.
+    final linkedItemsQuery = await FirebaseFirestore.instance
+        .collection('inventoryItems')
+        .where('location', isEqualTo: locationRef)
+        .limit(1)
+        .get();
+
+    if (!mounted) return;
+
+    // 3. If items are linked, show an error dialog and stop.
+    if (linkedItemsQuery.docs.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cannot Delete Location'),
+          content: Text('The location "$locationName" cannot be deleted because it is currently in use by one or more inventory items. Please re-assign those items to another location first.'),
+          actions: [
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      );
+      return; // Stop the function here
+    }
+
+    // 4. If no items are linked, proceed with the original confirmation dialog.
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -133,7 +165,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _showDeleteConfirmDialog(context, location.id, locationName),
+                      onPressed: () => _showDeleteConfirmDialog(location.id, locationName),
                     ),
                   ],
                 ),

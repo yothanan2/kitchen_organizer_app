@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V8: Added a provider to count low-stock inventory items.
+// V11: Added logic and providers for the Task Completion analytics report.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +10,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:collection/collection.dart';
+
+// ==== Enums moved here for global access ====
+enum NoteAudience { floor, kitchen, butcher, both }
 
 // ==== Core Firebase Providers ====
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
@@ -60,7 +63,6 @@ final unapprovedUsersCountProvider = StreamProvider<int>((ref) {
       .map((snapshot) => snapshot.docs.length);
 });
 
-// NEWLY ADDED PROVIDER
 final lowStockItemsCountProvider = StreamProvider<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
@@ -80,19 +82,52 @@ final lowStockItemsCountProvider = StreamProvider<int>((ref) {
   });
 });
 
+// ==== Daily Note Controller ====
+@immutable
+class DailyNoteState {
+  final bool isSaving;
+  final NoteAudience selectedAudience;
+  const DailyNoteState({ this.isSaving = false, this.selectedAudience = NoteAudience.both });
+  DailyNoteState copyWith({ bool? isSaving, NoteAudience? selectedAudience, }) {
+    return DailyNoteState(isSaving: isSaving ?? this.isSaving, selectedAudience: selectedAudience ?? this.selectedAudience);
+  }
+}
+class DailyNoteController extends StateNotifier<DailyNoteState> {
+  DailyNoteController(this.ref) : super(const DailyNoteState());
+  final Ref ref;
+
+  void setAudience(NoteAudience audience) {
+    state = state.copyWith(selectedAudience: audience);
+  }
+
+  Future<String?> saveNote(String note) async {
+    state = state.copyWith(isSaving: true);
+    final firestore = ref.read(firestoreProvider);
+    final todayId = ref.read(todayDocIdProvider(DateTime.now()));
+    final noteData = {
+      'forFloorStaff': state.selectedAudience == NoteAudience.floor || state.selectedAudience == NoteAudience.both ? note : '',
+      'forKitchenStaff': state.selectedAudience == NoteAudience.kitchen || state.selectedAudience == NoteAudience.both ? note : '',
+      'forButcherStaff': state.selectedAudience == NoteAudience.butcher || state.selectedAudience == NoteAudience.both ? note : '',
+    };
+    try {
+      await firestore.collection('dailyTodoLists').doc(todayId).set({'dailyNotes': noteData}, SetOptions(merge: true));
+      state = state.copyWith(isSaving: false);
+      return null;
+    } catch (e) {
+      state = state.copyWith(isSaving: false);
+      return e.toString();
+    }
+  }
+}
+final dailyNoteControllerProvider = StateNotifierProvider.autoDispose<DailyNoteController, DailyNoteState>((ref) => DailyNoteController(ref));
 
 // ==== Date & Task Providers ====
 final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
-
-final todayDocIdProvider = Provider.family<String, DateTime>((ref, date) {
-  return DateFormat('yyyy-MM-dd').format(date);
-});
-
+final todayDocIdProvider = Provider.family<String, DateTime>((ref, date) => DateFormat('yyyy-MM-dd').format(date));
 final dailyTodoListDocProvider = StreamProvider.family<DocumentSnapshot, String>((ref, date) {
   final firestore = ref.watch(firestoreProvider);
   return firestore.collection('dailyTodoLists').doc(date).snapshots();
 });
-
 @immutable
 class TaskListParams {
   final String collectionPath;
@@ -104,7 +139,6 @@ class TaskListParams {
   @override
   int get hashCode => collectionPath.hashCode ^ isCompleted.hashCode ^ date.hashCode;
 }
-
 final tasksStreamProvider = StreamProvider.family<QuerySnapshot, TaskListParams>((ref, params) {
   final firestore = ref.watch(firestoreProvider);
   return firestore.collection('dailyTodoLists').doc(params.date).collection(params.collectionPath).where('isCompleted', isEqualTo: params.isCompleted).orderBy('createdAt').snapshots();
@@ -141,11 +175,9 @@ class WeatherData {
       hourlyWeatherCode: hourly['weather_code'] as List<dynamic>,
     );
   }
-
   static (String, String) _mapWeatherCode(int code) {
     switch (code) { case 0: return ('Clear sky', '☀️'); case 1: return ('Mainly clear', '🌤️'); case 2: return ('Partly cloudy', '⛅'); case 3: return ('Overcast', '☁️'); case 45: case 48: return ('Fog', '🌫️'); case 51: case 53: case 55: return ('Drizzle', '🌦️'); case 61: case 63: case 65: return ('Rain', '🌧️'); case 66: case 67: return ('Freezing Rain', '🌨️'); case 71: case 73: case 75: return ('Snow fall', '❄️'); case 80: case 81: case 82: return ('Rain showers', '🌦️'); case 85: case 86: return ('Snow showers', '🌨️'); case 95: return ('Thunderstorm', '⛈️'); default: return ('Unknown', '🤷'); }
   }
-
   String? findFirstPrecipitation() {
     final now = DateTime.now();
     for (int i = 0; i < hourlyTime.length; i++) {
@@ -165,7 +197,6 @@ class WeatherData {
     return null;
   }
 }
-
 final weatherProvider = FutureProvider.autoDispose<WeatherData>((ref) async {
   final url = Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=55.68&longitude=12.59&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=weather_code&timezone=auto');
   final response = await http.get(url);
@@ -202,7 +233,6 @@ final inventoryItemProvider = FutureProvider.autoDispose.family<DocumentSnapshot
   if (docId.isEmpty) return null;
   return ref.watch(firestoreProvider).collection('inventoryItems').doc(docId).get();
 });
-
 @immutable
 class ItemFormState {
   final bool isLoading;
@@ -243,11 +273,7 @@ final butcherRequestableItemsProvider = StreamProvider.autoDispose<QuerySnapshot
 
 // ==== Floor Checklist Providers ====
 final floorChecklistItemsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
-  return ref.watch(firestoreProvider)
-      .collection('floor_checklist_items')
-      .orderBy('order')
-      .snapshots()
-      .map((snapshot) => snapshot.docs);
+  return ref.watch(firestoreProvider).collection('floor_checklist_items').orderBy('order').snapshots().map((snapshot) => snapshot.docs);
 });
 final dailyFloorChecklistProvider = StreamProvider.autoDispose<DocumentSnapshot>((ref) {
   final firestore = ref.watch(firestoreProvider);
@@ -270,8 +296,78 @@ class FloorChecklistController {
 }
 final floorChecklistControllerProvider = Provider.autoDispose<FloorChecklistController>((ref) => FloorChecklistController(ref));
 
+// ==== Preparation & Planning Providers ====
+final dishesProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('dishes').orderBy('dishName').snapshots());
+final prepTasksProvider = FutureProvider.autoDispose.family<QuerySnapshot, DocumentReference>((ref, dishRef) => dishRef.collection('prepTasks').get());
+@immutable
+class PreparationState {
+  final Map<String, bool> selectedTasks;
+  final Map<String, String> taskNotes;
+  final bool isLoading;
+  const PreparationState({ this.selectedTasks = const {}, this.taskNotes = const {}, this.isLoading = false });
+  PreparationState copyWith({ Map<String, bool>? selectedTasks, Map<String, String>? taskNotes, bool? isLoading }) => PreparationState(selectedTasks: selectedTasks ?? this.selectedTasks, taskNotes: taskNotes ?? this.taskNotes, isLoading: isLoading ?? this.isLoading);
+}
+class PreparationController extends StateNotifier<PreparationState> {
+  PreparationController(this.ref) : super(const PreparationState());
+  final Ref ref;
+  void toggleTask(String taskId, bool isSelected) { state = state.copyWith(selectedTasks: {...state.selectedTasks, taskId: isSelected}); }
+  void updateNote(String taskId, String note) { state = state.copyWith(taskNotes: {...state.taskNotes, taskId: note}); }
+  Future<String?> generateLists(DateTime forDate) async {
+    state = state.copyWith(isLoading: true);
+    final firestore = ref.read(firestoreProvider);
+    final dateString = DateFormat('yyyy-MM-dd').format(forDate);
+    final dailyListRef = firestore.collection('dailyTodoLists').doc(dateString);
+    final batch = firestore.batch();
+    try {
+      final dishesSnapshot = await firestore.collection('dishes').get();
+      final allTasksByDish = <String, QuerySnapshot>{};
+      for (final dishDoc in dishesSnapshot.docs) {
+        allTasksByDish[dishDoc.id] = await dishDoc.reference.collection('prepTasks').get();
+      }
+      final existingTasksSnapshot = await dailyListRef.collection('prepTasks').limit(1).get();
+      if (existingTasksSnapshot.docs.isNotEmpty) {
+        state = state.copyWith(isLoading: false);
+        return 'A prep list for this date already exists. Please clear it manually before generating a new one.';
+      }
+      batch.set(dailyListRef, {'createdAt': FieldValue.serverTimestamp(), 'date': dateString}, SetOptions(merge: true));
+      for (final entry in state.selectedTasks.entries) {
+        final taskId = entry.key;
+        final isSelected = entry.value;
+        if (isSelected) {
+          String? dishName;
+          DocumentSnapshot? taskDoc;
+          for (final dishDoc in dishesSnapshot.docs) {
+            final taskSnapshot = allTasksByDish[dishDoc.id];
+            final foundTask = taskSnapshot?.docs.firstWhereOrNull((doc) => doc.id == taskId);
+            if (foundTask != null) {
+              dishName = (dishDoc.data() as Map<String, dynamic>)['dishName'];
+              taskDoc = foundTask;
+              break;
+            }
+          }
+          if (taskDoc != null) {
+            final taskData = taskDoc.data() as Map<String, dynamic>;
+            final newTaskRef = dailyListRef.collection('prepTasks').doc();
+            batch.set(newTaskRef, {'taskName': taskData['taskName'], 'dishName': dishName ?? 'Unknown Dish', 'note': state.taskNotes[taskId] ?? '', 'isCompleted': false, 'createdAt': FieldValue.serverTimestamp()});
+          }
+        }
+      }
+      await batch.commit();
+      state = const PreparationState();
+      return null;
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      return 'Failed to generate lists: $e';
+    } finally {
+      if (state.isLoading) {
+        state = state.copyWith(isLoading: false);
+      }
+    }
+  }
+}
+final preparationControllerProvider = StateNotifierProvider.autoDispose<PreparationController, PreparationState>((ref) => PreparationController(ref));
 
-// ==== Other Providers ====
+// ==== General App Data Providers ====
 final allSuppliersProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) => ref.watch(firestoreProvider).collection('suppliers').orderBy('name').snapshots().map((s) => s.docs));
 final itemsBySupplierProvider = StreamProvider.autoDispose.family<List<QueryDocumentSnapshot>, String>((ref, supplierId) {
   final firestore = ref.watch(firestoreProvider);
@@ -288,7 +384,6 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
     yield groupBy(snapshot.docs, (doc) => locationMap[(doc.data() as Map<String, dynamic>)['location']?.id] ?? 'Uncategorized');
   }
 });
-
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
 final showCompletedTasksProvider = StateProvider<bool>((ref) => false);
 final newBarRequestsProvider = StreamProvider.autoDispose<List<DocumentSnapshot>>((ref) {
@@ -301,89 +396,103 @@ final tomorrowsFloorStaffPrepTasksProvider = StreamProvider.autoDispose<Set<Stri
   final tomorrowFormattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
   return firestore.collection('dailyTodoLists').doc(tomorrowFormattedDate).collection('prepTasks').where('category', isEqualTo: 'Floor Staff Report').snapshots().map((snapshot) => snapshot.docs.map((doc) => doc['originalFloorChecklistItemId'] as String).toSet());
 });
-final dishesProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('dishes').orderBy('dishName').snapshots());
-final prepTasksProvider = FutureProvider.autoDispose.family<QuerySnapshot, DocumentReference>((ref, dishRef) => dishRef.collection('prepTasks').get());
+
+// ==== Analytics Providers ==== // <-- NEW SECTION
 
 @immutable
-class PreparationState {
-  final Map<String, bool> selectedTasks;
-  final Map<String, String> taskNotes;
-  final bool isLoading;
-  const PreparationState({ this.selectedTasks = const {}, this.taskNotes = const {}, this.isLoading = false });
-  PreparationState copyWith({ Map<String, bool>? selectedTasks, Map<String, String>? taskNotes, bool? isLoading }) => PreparationState(selectedTasks: selectedTasks ?? this.selectedTasks, taskNotes: taskNotes ?? this.taskNotes, isLoading: isLoading ?? this.isLoading);
+class AnalyzedIngredient {
+  final String name;
+  final String unit;
+  final num totalQuantity;
+  const AnalyzedIngredient({ required this.name, required this.unit, required this.totalQuantity });
 }
-class PreparationController extends StateNotifier<PreparationState> {
-  PreparationController(this.ref) : super(const PreparationState());
+
+@immutable
+class TaskChampion {
+  final String name;
+  final int taskCount;
+  const TaskChampion({ required this.name, required this.taskCount });
+}
+
+class AnalyticsController {
   final Ref ref;
-  void toggleTask(String taskId, bool isSelected) { state = state.copyWith(selectedTasks: {...state.selectedTasks, taskId: isSelected}); }
-  void updateNote(String taskId, String note) { state = state.copyWith(taskNotes: {...state.taskNotes, taskId: note}); }
+  AnalyticsController(this.ref);
 
-  Future<String?> generateLists(DateTime forDate) async {
-    state = state.copyWith(isLoading: true);
+  Future<List<AnalyzedIngredient>> getMostUsedIngredients({ required DateTime startDate, required DateTime endDate, }) async {
     final firestore = ref.read(firestoreProvider);
-    final dateString = DateFormat('yyyy-MM-dd').format(forDate);
-    final dailyListRef = firestore.collection('dailyTodoLists').doc(dateString);
-    final batch = firestore.batch();
-
-    try {
-      final dishesSnapshot = await firestore.collection('dishes').get();
-      final allTasksByDish = <String, QuerySnapshot>{};
-      for (final dishDoc in dishesSnapshot.docs) {
-        allTasksByDish[dishDoc.id] = await dishDoc.reference.collection('prepTasks').get();
-      }
-
-      final existingTasksSnapshot = await dailyListRef.collection('prepTasks').limit(1).get();
-      if (existingTasksSnapshot.docs.isNotEmpty) {
-        state = state.copyWith(isLoading: false);
-        return 'A prep list for this date already exists. Please clear it manually before generating a new one.';
-      }
-
-      batch.set(dailyListRef, {'createdAt': FieldValue.serverTimestamp(), 'date': dateString}, SetOptions(merge: true));
-
-      for (final entry in state.selectedTasks.entries) {
-        final taskId = entry.key;
-        final isSelected = entry.value;
-
-        if (isSelected) {
-          String? dishName;
-          DocumentSnapshot? taskDoc;
-
-          for (final dishDoc in dishesSnapshot.docs) {
-            final taskSnapshot = allTasksByDish[dishDoc.id];
-            // Use .firstWhereOrNull from collection package to avoid exceptions
-            final foundTask = taskSnapshot?.docs.firstWhereOrNull((doc) => doc.id == taskId);
-            if (foundTask != null) {
-              dishName = (dishDoc.data() as Map<String, dynamic>)['dishName'];
-              taskDoc = foundTask;
-              break;
-            }
-          }
-
-          if (taskDoc != null) {
-            final taskData = taskDoc.data() as Map<String, dynamic>;
-            final newTaskRef = dailyListRef.collection('prepTasks').doc();
-            batch.set(newTaskRef, {
-              'taskName': taskData['taskName'],
-              'dishName': dishName ?? 'Unknown Dish',
-              'note': state.taskNotes[taskId] ?? '',
-              'isCompleted': false,
-              'createdAt': FieldValue.serverTimestamp(),
-            });
-          }
+    final unitsMap = await ref.read(unitsMapProvider.future);
+    final inventoryItemsMap = <String, String>{};
+    final usageMap = <String, Map<String, num>>{};
+    final dailyListsSnapshot = await firestore.collection('dailyTodoLists').where('date', isGreaterThanOrEqualTo: DateFormat('yyyy-MM-dd').format(startDate)).where('date', isLessThanOrEqualTo: DateFormat('yyyy-MM-dd').format(endDate)).get();
+    for (final dailyDoc in dailyListsSnapshot.docs) {
+      final requisitionsSnapshot = await dailyDoc.reference.collection('stockRequisitions').get();
+      for (final reqDoc in requisitionsSnapshot.docs) {
+        final data = reqDoc.data();
+        final itemRef = data['inventoryItemRef'] as DocumentReference?;
+        final unitRef = data['unitRef'] as DocumentReference?;
+        final quantity = data['quantity'] as num?;
+        if (itemRef != null && unitRef != null && quantity != null && quantity > 0) {
+          final itemId = itemRef.id;
+          final unitId = unitRef.id;
+          usageMap.putIfAbsent(itemId, () => {});
+          usageMap[itemId]!.putIfAbsent(unitId, () => 0);
+          usageMap[itemId]![unitId] = usageMap[itemId]![unitId]! + quantity;
         }
       }
-
-      await batch.commit();
-      state = const PreparationState();
-      return null;
-    } catch (e) {
-      state = state.copyWith(isLoading: false);
-      return 'Failed to generate lists: $e';
-    } finally {
-      if (state.isLoading) {
-        state = state.copyWith(isLoading: false);
+    }
+    final result = <AnalyzedIngredient>[];
+    for (final entry in usageMap.entries) {
+      final itemId = entry.key;
+      final usageByUnit = entry.value;
+      if (!inventoryItemsMap.containsKey(itemId)) {
+        final itemDoc = await firestore.collection('inventoryItems').doc(itemId).get();
+        inventoryItemsMap[itemId] = (itemDoc.data() as Map<String, dynamic>)['itemName'] ?? 'Unknown Item';
+      }
+      final itemName = inventoryItemsMap[itemId]!;
+      for (final unitEntry in usageByUnit.entries) {
+        final unitId = unitEntry.key;
+        final totalQuantity = unitEntry.value;
+        final unitName = unitsMap[unitId] ?? 'Unknown Unit';
+        result.add(AnalyzedIngredient(name: itemName, unit: unitName, totalQuantity: totalQuantity));
       }
     }
+    result.sort((a, b) => b.totalQuantity.compareTo(a.totalQuantity));
+    return result;
+  }
+
+  Future<List<TaskChampion>> getTaskCompletionStats({ required DateTime startDate, required DateTime endDate, }) async {
+    final firestore = ref.read(firestoreProvider);
+    final completionCounts = <String, int>{};
+    final dailyListsSnapshot = await firestore.collection('dailyTodoLists').where('date', isGreaterThanOrEqualTo: DateFormat('yyyy-MM-dd').format(startDate)).where('date', isLessThanOrEqualTo: DateFormat('yyyy-MM-dd').format(endDate)).get();
+
+    for (final dailyDoc in dailyListsSnapshot.docs) {
+      final prepTasksSnapshot = await dailyDoc.reference.collection('prepTasks').where('isCompleted', isEqualTo: true).get();
+      final stockReqsSnapshot = await dailyDoc.reference.collection('stockRequisitions').where('isCompleted', isEqualTo: true).get();
+      final allTasks = [...prepTasksSnapshot.docs, ...stockReqsSnapshot.docs];
+
+      for (final taskDoc in allTasks) {
+        final data = taskDoc.data();
+        final completedBy = data['completedBy'] as String?;
+        if (completedBy != null && completedBy.isNotEmpty) {
+          completionCounts.update(completedBy, (value) => value + 1, ifAbsent: () => 1);
+        }
+      }
+    }
+
+    final result = completionCounts.entries.map((entry) => TaskChampion(name: entry.key, taskCount: entry.value)).toList();
+    result.sort((a, b) => b.taskCount.compareTo(a.taskCount));
+    return result;
   }
 }
-final preparationControllerProvider = StateNotifierProvider.autoDispose<PreparationController, PreparationState>((ref) => PreparationController(ref));
+
+final analyticsControllerProvider = Provider<AnalyticsController>((ref) => AnalyticsController(ref));
+
+final mostUsedIngredientsProvider = FutureProvider.autoDispose.family<List<AnalyzedIngredient>, DateTimeRange>((ref, dateRange) {
+  final controller = ref.watch(analyticsControllerProvider);
+  return controller.getMostUsedIngredients(startDate: dateRange.start, endDate: dateRange.end);
+});
+
+final taskCompletionProvider = FutureProvider.autoDispose.family<List<TaskChampion>, DateTimeRange>((ref, dateRange) {
+  final controller = ref.watch(analyticsControllerProvider);
+  return controller.getTaskCompletionStats(startDate: dateRange.start, endDate: dateRange.end);
+});
