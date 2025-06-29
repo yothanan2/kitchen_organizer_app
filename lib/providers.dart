@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V11: Added logic and providers for the Task Completion analytics report.
+// V12: Updated inventoryItemProvider to return a type-safe InventoryItem model.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:collection/collection.dart';
+import 'models/models.dart'; // <-- ADDED IMPORT FOR OUR MODELS
 
 // ==== Enums moved here for global access ====
 enum NoteAudience { floor, kitchen, butcher, both }
@@ -229,10 +230,17 @@ final suppliersStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) 
 final locationsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('locations').orderBy('name').snapshots());
 
 // ==== Add/Edit Inventory Item Providers ====
-final inventoryItemProvider = FutureProvider.autoDispose.family<DocumentSnapshot?, String>((ref, docId) async {
+
+// UPDATED: This provider now returns a type-safe InventoryItem object.
+final inventoryItemProvider = FutureProvider.autoDispose.family<InventoryItem?, String>((ref, docId) async {
   if (docId.isEmpty) return null;
-  return ref.watch(firestoreProvider).collection('inventoryItems').doc(docId).get();
+  final doc = await ref.watch(firestoreProvider).collection('inventoryItems').doc(docId).get();
+  if (doc.exists) {
+    return InventoryItem.fromFirestore(doc.data()!, doc.id);
+  }
+  return null;
 });
+
 @immutable
 class ItemFormState {
   final bool isLoading;
@@ -397,8 +405,7 @@ final tomorrowsFloorStaffPrepTasksProvider = StreamProvider.autoDispose<Set<Stri
   return firestore.collection('dailyTodoLists').doc(tomorrowFormattedDate).collection('prepTasks').where('category', isEqualTo: 'Floor Staff Report').snapshots().map((snapshot) => snapshot.docs.map((doc) => doc['originalFloorChecklistItemId'] as String).toSet());
 });
 
-// ==== Analytics Providers ==== // <-- NEW SECTION
-
+// ==== Analytics Providers ====
 @immutable
 class AnalyzedIngredient {
   final String name;
@@ -484,14 +491,11 @@ class AnalyticsController {
     return result;
   }
 }
-
 final analyticsControllerProvider = Provider<AnalyticsController>((ref) => AnalyticsController(ref));
-
 final mostUsedIngredientsProvider = FutureProvider.autoDispose.family<List<AnalyzedIngredient>, DateTimeRange>((ref, dateRange) {
   final controller = ref.watch(analyticsControllerProvider);
   return controller.getMostUsedIngredients(startDate: dateRange.start, endDate: dateRange.end);
 });
-
 final taskCompletionProvider = FutureProvider.autoDispose.family<List<TaskChampion>, DateTimeRange>((ref, dateRange) {
   final controller = ref.watch(analyticsControllerProvider);
   return controller.getTaskCompletionStats(startDate: dateRange.start, endDate: dateRange.end);

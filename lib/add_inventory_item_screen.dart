@@ -1,16 +1,12 @@
 // lib/add_inventory_item_screen.dart
-// FINAL CORRECTED VERSION: Includes "Butcher Item" switch and robust state handling.
+// REFACTORED: Updated to use the central InventoryItem model from the provider.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers.dart';
-
-// A generic dropdown provider for simplicity
-final dropdownStreamProvider = StreamProvider.autoDispose.family<QuerySnapshot, String>(
-        (ref, collection) => ref.watch(firestoreProvider).collection(collection).orderBy('name').snapshots()
-);
+import 'models/models.dart'; // <-- ADDED IMPORT FOR OUR MODELS
 
 class AddInventoryItemScreen extends ConsumerStatefulWidget {
   final String? documentId;
@@ -25,7 +21,6 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
   final _itemNameController = TextEditingController();
   final _minStockController = TextEditingController();
 
-  // Local state for dropdown values
   String? _selectedCategoryId;
   String? _selectedSupplierId;
   String? _selectedLocationId;
@@ -47,24 +42,24 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
     final formController = ref.read(itemFormControllerProvider.notifier);
 
     if (isEditing) {
-      // For editing, we listen to the item provider to populate the form once
-      ref.listen<AsyncValue<DocumentSnapshot?>>(inventoryItemProvider(widget.documentId!), (prev, next) {
-        if (!_isInitialized && next.hasValue && next.value?.data() != null) {
-          final data = next.value!.data() as Map<String, dynamic>;
+      // UPDATED: The listener now correctly expects an InventoryItem.
+      ref.listen<AsyncValue<InventoryItem?>>(inventoryItemProvider(widget.documentId!), (prev, next) {
+        if (!_isInitialized && next.hasValue && next.value != null) {
+          final item = next.value!; // We know item is not null here.
 
-          _itemNameController.text = data['itemName'] ?? '';
-          _minStockController.text = (data['minStockLevel'] ?? 0).toString();
+          // UPDATED: Logic is now cleaner, using the model's properties.
+          _itemNameController.text = item.itemName;
+          _minStockController.text = item.minStockLevel.toString();
 
-          // Set local state for dropdowns
           setState(() {
-            _selectedCategoryId = (data['category'] as DocumentReference?)?.id;
-            _selectedSupplierId = (data['supplier'] as DocumentReference?)?.id;
-            _selectedLocationId = (data['location'] as DocumentReference?)?.id;
-            _selectedUnitId = (data['unit'] as DocumentReference?)?.id;
+            _selectedCategoryId = item.category?.id;
+            _selectedSupplierId = item.supplier?.id;
+            _selectedLocationId = item.location?.id;
+            _selectedUnitId = item.unit?.id;
           });
 
-          // Set the initial state in the Riverpod controller
-          formController.setInitialState(data);
+          // Update the controller with the specific state it manages.
+          formController.updateIsButcherItem(item.isButcherItem);
           _isInitialized = true;
         }
       });
@@ -79,7 +74,9 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
               : IconButton(
             onPressed: () async {
               if (_formKey.currentState!.validate()) {
-                // Consolidate all data from local controllers and state into one map
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+
                 final Map<String, dynamic> itemData = {
                   'itemName': _itemNameController.text,
                   'minStockLevel': num.tryParse(_minStockController.text) ?? 0,
@@ -94,13 +91,11 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
                     itemData: itemData
                 );
 
-                if (context.mounted) {
-                  if (error == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Item ${isEditing ? 'updated' : 'added'} successfully!')));
-                    Navigator.of(context).pop();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                  }
+                if (error == null) {
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Item ${isEditing ? 'updated' : 'added'} successfully!')));
+                  navigator.pop();
+                } else {
+                  scaffoldMessenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
                 }
               }
             },
@@ -154,6 +149,11 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
   }
 
   Widget _buildDropdown(String collection, String hint, String? value, Function(String?) onChanged, {bool isRequired = false}) {
+    // This defines a local provider just for this dropdown widget.
+    final dropdownStreamProvider = StreamProvider.autoDispose.family<QuerySnapshot, String>(
+            (ref, collection) => ref.watch(firestoreProvider).collection(collection).orderBy('name').snapshots()
+    );
+
     return Consumer(
       builder: (context, ref, child) {
         final asyncData = ref.watch(dropdownStreamProvider(collection));

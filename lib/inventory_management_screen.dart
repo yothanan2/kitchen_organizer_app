@@ -1,5 +1,5 @@
 // lib/inventory_management_screen.dart
-// REFACTORED: Removed the local data model and now uses the central one from models.dart
+// UPDATED: Now navigates to the official AddInventoryItemScreen.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,16 +7,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import 'providers.dart';
-import 'add_edit_inventory_item_screen.dart';
-import 'models/models.dart'; // <-- IMPORT the central models
-
-// The local InventoryItem class has been removed from this file.
+import 'add_inventory_item_screen.dart'; // <-- CORRECTED IMPORT
+import 'models/models.dart';
 
 // Provider to fetch all inventory items using the central model.
 final allInventoryItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore.collection('inventoryItems').snapshots().map((snapshot) {
-    // Map the documents to the central InventoryItem model
     return snapshot.docs.map((doc) => InventoryItem.fromFirestore(doc.data(), doc.id)).toList();
   });
 });
@@ -131,7 +128,8 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
   void _navigateToEditItem(String? docId) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => AddEditInventoryItemScreen(docId: docId),
+        // CORRECTED: Navigates to the screen we decided to keep.
+        builder: (context) => AddInventoryItemScreen(documentId: docId),
       ),
     );
   }
