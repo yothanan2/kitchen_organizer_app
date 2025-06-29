@@ -1,5 +1,5 @@
 // lib/providers.dart
-// CORRECTED V6: Added the generateLists method to the PreparationController.
+// V7: Added a provider to count unapproved users.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -51,6 +51,18 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
   });
 });
 
+// NEWLY ADDED PROVIDER
+final unapprovedUsersCountProvider = StreamProvider<int>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('users')
+      .where('isApproved', isEqualTo: false)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.length);
+});
+
+
+// ==== Date & Task Providers ====
 final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 
 final todayDocIdProvider = Provider.family<String, DateTime>((ref, date) {
@@ -212,7 +224,11 @@ final butcherRequestableItemsProvider = StreamProvider.autoDispose<QuerySnapshot
 
 // ==== Floor Checklist Providers ====
 final floorChecklistItemsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
-  return ref.watch(firestoreProvider).collection('floor_checklist_items').orderBy('order').snapshots().map((snapshot) => snapshot.docs);
+  return ref.watch(firestoreProvider)
+      .collection('floor_checklist_items')
+      .orderBy('order')
+      .snapshots()
+      .map((snapshot) => snapshot.docs);
 });
 final dailyFloorChecklistProvider = StreamProvider.autoDispose<DocumentSnapshot>((ref) {
   final firestore = ref.watch(firestoreProvider);
@@ -234,6 +250,7 @@ class FloorChecklistController {
   }
 }
 final floorChecklistControllerProvider = Provider.autoDispose<FloorChecklistController>((ref) => FloorChecklistController(ref));
+
 
 // ==== Other Providers ====
 final allSuppliersProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) => ref.watch(firestoreProvider).collection('suppliers').orderBy('name').snapshots().map((s) => s.docs));
@@ -282,7 +299,6 @@ class PreparationController extends StateNotifier<PreparationState> {
   void toggleTask(String taskId, bool isSelected) { state = state.copyWith(selectedTasks: {...state.selectedTasks, taskId: isSelected}); }
   void updateNote(String taskId, String note) { state = state.copyWith(taskNotes: {...state.taskNotes, taskId: note}); }
 
-  // NEW: The generateLists method
   Future<String?> generateLists(DateTime forDate) async {
     state = state.copyWith(isLoading: true);
     final firestore = ref.read(firestoreProvider);
@@ -291,36 +307,32 @@ class PreparationController extends StateNotifier<PreparationState> {
     final batch = firestore.batch();
 
     try {
-      // Fetch all dishes and their tasks
       final dishesSnapshot = await firestore.collection('dishes').get();
       final allTasksByDish = <String, QuerySnapshot>{};
       for (final dishDoc in dishesSnapshot.docs) {
         allTasksByDish[dishDoc.id] = await dishDoc.reference.collection('prepTasks').get();
       }
 
-      // Check if tasks for this day already exist to prevent overwriting.
       final existingTasksSnapshot = await dailyListRef.collection('prepTasks').limit(1).get();
       if (existingTasksSnapshot.docs.isNotEmpty) {
         state = state.copyWith(isLoading: false);
         return 'A prep list for this date already exists. Please clear it manually before generating a new one.';
       }
 
-      // Set some initial data on the daily document
       batch.set(dailyListRef, {'createdAt': FieldValue.serverTimestamp(), 'date': dateString}, SetOptions(merge: true));
 
-      // Iterate through the selected tasks from the UI state
       for (final entry in state.selectedTasks.entries) {
         final taskId = entry.key;
         final isSelected = entry.value;
 
         if (isSelected) {
-          // Find the dish and task details for the selected taskId
           String? dishName;
           DocumentSnapshot? taskDoc;
 
           for (final dishDoc in dishesSnapshot.docs) {
             final taskSnapshot = allTasksByDish[dishDoc.id];
-            final foundTask = taskSnapshot?.docs.firstWhere((doc) => doc.id == taskId, orElse: () => throw Exception('Task not found'));
+            // Use .firstWhereOrNull from collection package to avoid exceptions
+            final foundTask = taskSnapshot?.docs.firstWhereOrNull((doc) => doc.id == taskId);
             if (foundTask != null) {
               dishName = (dishDoc.data() as Map<String, dynamic>)['dishName'];
               taskDoc = foundTask;
@@ -343,11 +355,16 @@ class PreparationController extends StateNotifier<PreparationState> {
       }
 
       await batch.commit();
-      state = const PreparationState(); // Reset state after successful generation
+      state = const PreparationState();
       return null;
     } catch (e) {
       state = state.copyWith(isLoading: false);
       return 'Failed to generate lists: $e';
+    } finally {
+      // This is a good place to ensure isLoading is always reset.
+      if (state.isLoading) {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 }

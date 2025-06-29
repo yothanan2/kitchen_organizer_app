@@ -1,12 +1,12 @@
 // lib/admin_home_screen.dart
-// CORRECTED: Updated to work with family providers and fixed the icon error.
+// UPDATED: Added a dynamic metric card for pending user approvals.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // <-- ADDED THIS IMPORT for date formatting
+import 'package:intl/intl.dart';
 
 import 'dish_management_screen.dart';
 import 'user_management_screen.dart';
@@ -43,7 +43,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   }
 
   void _loadCurrentNote() {
-    // UPDATED: Provide the current date to the family provider
     final dateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final dailyDoc = ref.read(dailyTodoListDocProvider(dateString)).value;
     if (dailyDoc != null && dailyDoc.exists) {
@@ -62,7 +61,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   Future<void> _saveDailyNote() async {
     setState(() { _isSavingNote = true; });
     final firestore = ref.read(firestoreProvider);
-    // UPDATED: Provide the current date to the family provider
     final todayId = ref.read(todayDocIdProvider(DateTime.now()));
     final note = _noteController.text.trim();
     final Map<String, dynamic> noteData = {
@@ -95,7 +93,9 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // UPDATED: Provide the current date to the family provider
+    // Watch our new provider to get the count of unapproved users.
+    final unapprovedUsersCount = ref.watch(unapprovedUsersCountProvider);
+
     final dateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
     ref.listen<AsyncValue<DocumentSnapshot>>(dailyTodoListDocProvider(dateString), (_, next) {
       final dailyDoc = next.value;
@@ -138,6 +138,15 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16.0),
           children: <Widget>[
+            // NEW: The dynamic metric card is added here.
+            _buildMetricCard(
+              context: context,
+              title: 'Pending Approvals',
+              icon: Icons.person_add_outlined,
+              asyncValue: unapprovedUsersCount,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen())),
+            ),
+            const SizedBox(height: 16),
             Card(
               elevation: 4,
               child: Padding(
@@ -187,7 +196,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Inventory Management', icon: Icons.inventory_2_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen()))),
             const SizedBox(height: 12),
-            // CORRECTED ICON: Replaced non-existent icon with a valid one
             _buildMenuButton(context, title: 'Butcher Requisition Form', icon: Icons.set_meal_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ButcherRequisitionScreen()))),
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Manage Floor Checklist', icon: Icons.deck_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const FloorChecklistItemsScreen()))),
@@ -198,6 +206,60 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Generate Shopping List', icon: Icons.shopping_cart_checkout_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ShoppingListScreen()))),
           ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: A reusable helper widget for our dashboard metric cards.
+  Widget _buildMetricCard({
+    required BuildContext context,
+    required String title,
+    required IconData icon,
+    required AsyncValue<int> asyncValue,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 4,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 40, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              asyncValue.when(
+                loading: () => const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                error: (err, stack) => Icon(Icons.error_outline, color: Colors.red.shade700),
+                data: (count) {
+                  if (count == 0) {
+                    return const Icon(Icons.check_circle_outline, color: Colors.green, size: 30);
+                  }
+                  return CircleAvatar(
+                    radius: 15,
+                    backgroundColor: Colors.red.shade700,
+                    child: Text(
+                      count.toString(),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward_ios, color: Colors.grey),
+            ],
+          ),
         ),
       ),
     );
