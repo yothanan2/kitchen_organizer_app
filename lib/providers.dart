@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V7: Added a provider to count unapproved users.
+// V8: Added a provider to count low-stock inventory items.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -51,7 +51,6 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
   });
 });
 
-// NEWLY ADDED PROVIDER
 final unapprovedUsersCountProvider = StreamProvider<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
@@ -59,6 +58,26 @@ final unapprovedUsersCountProvider = StreamProvider<int>((ref) {
       .where('isApproved', isEqualTo: false)
       .snapshots()
       .map((snapshot) => snapshot.docs.length);
+});
+
+// NEWLY ADDED PROVIDER
+final lowStockItemsCountProvider = StreamProvider<int>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('inventoryItems')
+      .snapshots()
+      .map((snapshot) {
+    int count = 0;
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final num quantity = data['quantityOnHand'] ?? 0;
+      final num minStock = data['minStockLevel'] ?? 0;
+      if (quantity <= minStock) {
+        count++;
+      }
+    }
+    return count;
+  });
 });
 
 
@@ -361,7 +380,6 @@ class PreparationController extends StateNotifier<PreparationState> {
       state = state.copyWith(isLoading: false);
       return 'Failed to generate lists: $e';
     } finally {
-      // This is a good place to ensure isLoading is always reset.
       if (state.isLoading) {
         state = state.copyWith(isLoading: false);
       }

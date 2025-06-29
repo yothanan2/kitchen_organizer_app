@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// UPDATED: Added a dynamic metric card for pending user approvals.
+// UPDATED: Added a second metric card for low-stock items.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -93,8 +93,9 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch our new provider to get the count of unapproved users.
+    // Watch both of our new metric providers.
     final unapprovedUsersCount = ref.watch(unapprovedUsersCountProvider);
+    final lowStockItemsCount = ref.watch(lowStockItemsCountProvider); // <-- ADDED
 
     final dateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
     ref.listen<AsyncValue<DocumentSnapshot>>(dailyTodoListDocProvider(dateString), (_, next) {
@@ -138,13 +139,21 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16.0),
           children: <Widget>[
-            // NEW: The dynamic metric card is added here.
+            // We build a card for each metric.
             _buildMetricCard(
               context: context,
               title: 'Pending Approvals',
               icon: Icons.person_add_outlined,
               asyncValue: unapprovedUsersCount,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen())),
+            ),
+            const SizedBox(height: 8), // Spacing between cards
+            _buildMetricCard( // <-- ADDED
+              context: context,
+              title: 'Low-Stock Items',
+              icon: Icons.warning_amber_rounded,
+              asyncValue: lowStockItemsCount,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen())),
             ),
             const SizedBox(height: 16),
             Card(
@@ -211,7 +220,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     );
   }
 
-  // NEW: A reusable helper widget for our dashboard metric cards.
   Widget _buildMetricCard({
     required BuildContext context,
     required String title,
@@ -248,7 +256,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                   }
                   return CircleAvatar(
                     radius: 15,
-                    backgroundColor: Colors.red.shade700,
+                    backgroundColor: Colors.orange.shade800, // Changed color for distinction
                     child: Text(
                       count.toString(),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
