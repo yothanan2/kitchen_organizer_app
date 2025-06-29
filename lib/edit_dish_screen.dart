@@ -1,11 +1,9 @@
 // lib/edit_dish_screen.dart
-// CORRECTED: Updated imports and fixed BuildContext across async gaps warnings.
+// UPDATED: Now hides detailed sections when creating a new dish for a simpler workflow.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dropdown_search/dropdown_search.dart';
-
-// CORRECTED: Import the new reusable widget.
 import 'widgets/firestore_name_widget.dart';
 
 class EditDishScreen extends StatefulWidget {
@@ -99,7 +97,6 @@ class _EditDishScreenState extends State<EditDishScreen> {
       }
     }
 
-    // Capture context before the async gap
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     final newItemData = await showDialog<Map<String, dynamic>>(
@@ -210,7 +207,6 @@ class _EditDishScreenState extends State<EditDishScreen> {
       }
     }
 
-    // Capture context before the async gap
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     final result = await showDialog<Map<String, dynamic>>(
@@ -346,7 +342,9 @@ class _EditDishScreenState extends State<EditDishScreen> {
             children: [
               TextFormField(controller: _dishNameController, decoration: InputDecoration(labelText: _isComponent ? "Component Name" : "Dish Name", border: const OutlineInputBorder()), validator: (v) => (v == null || v.isEmpty) ? "Please enter a name" : null),
 
-              if (!_isComponent) ...[
+              // --- MODIFICATION START ---
+              // Only show these fields if editing, not creating a new dish.
+              if (_isEditing) ...[
                 const SizedBox(height: 16),
                 TextFormField(controller: _categoryController, decoration: const InputDecoration(labelText: "Category (e.g., Antipasti)", border: OutlineInputBorder())),
               ],
@@ -355,12 +353,14 @@ class _EditDishScreenState extends State<EditDishScreen> {
               Card(
                 child: Column(
                   children: [
-                    SwitchListTile(
-                      title: const Text("Is a Component"),
-                      subtitle: const Text("Components (like sauces or bases) can be selected in other recipes."),
-                      value: _isComponent,
-                      onChanged: (value) => setState(() => _isComponent = value),
-                    ),
+                    // Only show "Is Component" if editing or explicitly creating a component
+                    if (_isEditing || widget.isCreatingComponent)
+                      SwitchListTile(
+                        title: const Text("Is a Component"),
+                        subtitle: const Text("Components (like sauces or bases) can be selected in other recipes."),
+                        value: _isComponent,
+                        onChanged: (value) => setState(() => _isComponent = value),
+                      ),
                     if (!_isComponent)
                       SwitchListTile(
                         title: const Text("Is Active"),
@@ -372,72 +372,75 @@ class _EditDishScreenState extends State<EditDishScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
-              _buildSectionHeader("Ingredients", () => _showIngredientDialog()),
-              _ingredients.isEmpty
-                  ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No ingredients added.")))
-                  : ListView.builder(
-                shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: _ingredients.length,
-                itemBuilder: (context, index) {
-                  final ingredient = _ingredients[index];
-                  final bool isOnHand = ingredient['type'] == 'on-hand';
-                  return ListTile(
-                    title: FirestoreNameWidget(collection: 'inventoryItems', docId: ingredient['inventoryItemId'], fieldName: 'itemName'),
-                    subtitle: isOnHand ? const Text("On-Hand Item", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue)) : Row(mainAxisSize: MainAxisSize.min, children: [Text(ingredient['quantity'].toString()), const SizedBox(width: 4), FirestoreNameWidget(collection: 'units', docId: ingredient['unitId'])]),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey), onPressed: () => _showIngredientDialog(editIndex: index)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _ingredients.removeAt(index))),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              if (!_isComponent) ...[
+              if (_isEditing) ...[
                 const SizedBox(height: 24),
-                _buildSectionHeader("Dish Components / Prep Steps", () => _showPrepTaskDialog(index: null)),
-                if (_prepTasks.isEmpty)
-                  const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No components or steps added.")))
-                else
-                  ReorderableListView.builder(
-                    shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: _prepTasks.length,
-                    itemBuilder: (context, index) {
-                      final task = _prepTasks[index];
-                      return Card(
-                        key: ValueKey(task['taskName']! + index.toString()),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                          leading: const Icon(Icons.drag_handle, color: Colors.grey),
-                          title: Text(task['taskName'] ?? ''),
-                          subtitle: task['linkedDishId'] != null ? Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.link, size: 12, color: Colors.grey), const SizedBox(width: 4), FirestoreNameWidget(collection: 'dishes', docId: task['linkedDishId'], fieldName: 'dishName', defaultText: "Linked Recipe")]) : null,
-                          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                            IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey), onPressed: () => _showPrepTaskDialog(index: index)),
-                            IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _prepTasks.removeAt(index))),
-                          ]),
-                        ),
-                      );
-                    },
-                    onReorder: (oldIndex, newIndex) {
-                      setState(() {
-                        if (newIndex > oldIndex) {
-                          newIndex -= 1;
-                        }
-                        final item = _prepTasks.removeAt(oldIndex);
-                        _prepTasks.insert(newIndex, item);
-                        for (int i = 0; i < _prepTasks.length; i++) {
-                          _prepTasks[i]['order'] = i;
-                        }
-                      });
-                    },
-                  ),
-              ],
+                _buildSectionHeader("Ingredients", () => _showIngredientDialog()),
+                _ingredients.isEmpty
+                    ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No ingredients added.")))
+                    : ListView.builder(
+                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: _ingredients.length,
+                  itemBuilder: (context, index) {
+                    final ingredient = _ingredients[index];
+                    final bool isOnHand = ingredient['type'] == 'on-hand';
+                    return ListTile(
+                      title: FirestoreNameWidget(collection: 'inventoryItems', docId: ingredient['inventoryItemId'], fieldName: 'itemName'),
+                      subtitle: isOnHand ? const Text("On-Hand Item", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue)) : Row(mainAxisSize: MainAxisSize.min, children: [Text(ingredient['quantity'].toString()), const SizedBox(width: 4), FirestoreNameWidget(collection: 'units', docId: ingredient['unitId'])]),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey), onPressed: () => _showIngredientDialog(editIndex: index)),
+                          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _ingredients.removeAt(index))),
+                        ],
+                      ),
+                    );
+                  },
+                ),
 
-              const SizedBox(height: 24),
-              const Text("Recipe Instructions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              TextFormField(controller: _recipeInstructionsController, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "1. Combine all ingredients..."), maxLines: 10),
+                if (!_isComponent) ...[
+                  const SizedBox(height: 24),
+                  _buildSectionHeader("Dish Components / Prep Steps", () => _showPrepTaskDialog(index: null)),
+                  if (_prepTasks.isEmpty)
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No components or steps added.")))
+                  else
+                    ReorderableListView.builder(
+                      shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: _prepTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = _prepTasks[index];
+                        return Card(
+                          key: ValueKey(task['taskName']! + index.toString()),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListTile(
+                            leading: const Icon(Icons.drag_handle, color: Colors.grey),
+                            title: Text(task['taskName'] ?? ''),
+                            subtitle: task['linkedDishId'] != null ? Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.link, size: 12, color: Colors.grey), const SizedBox(width: 4), FirestoreNameWidget(collection: 'dishes', docId: task['linkedDishId'], fieldName: 'dishName', defaultText: "Linked Recipe")]) : null,
+                            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                              IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey), onPressed: () => _showPrepTaskDialog(index: index)),
+                              IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _prepTasks.removeAt(index))),
+                            ]),
+                          ),
+                        );
+                      },
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) {
+                            newIndex -= 1;
+                          }
+                          final item = _prepTasks.removeAt(oldIndex);
+                          _prepTasks.insert(newIndex, item);
+                          for (int i = 0; i < _prepTasks.length; i++) {
+                            _prepTasks[i]['order'] = i;
+                          }
+                        });
+                      },
+                    ),
+                ],
+
+                const SizedBox(height: 24),
+                const Text("Recipe Instructions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextFormField(controller: _recipeInstructionsController, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "1. Combine all ingredients..."), maxLines: 10),
+              ],
+              // --- MODIFICATION END ---
             ],
           ),
         ),
