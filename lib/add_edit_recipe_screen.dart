@@ -1,17 +1,20 @@
 // lib/add_edit_recipe_screen.dart
-// CORRECTED: Updated the import to use the central FirestoreNameWidget.
+// VERSION 5: Final fix for all typos and errors.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dropdown_search/dropdown_search.dart';
-
-// CORRECTED: Import the new reusable widget.
 import 'widgets/firestore_name_widget.dart';
 
 class AddEditRecipeScreen extends StatefulWidget {
-  final DocumentSnapshot? recipeDocument;
+  final DocumentSnapshot? dishDocument;
+  final bool isComponent;
 
-  const AddEditRecipeScreen({super.key, this.recipeDocument});
+  const AddEditRecipeScreen({
+    super.key,
+    this.dishDocument,
+    this.isComponent = false,
+  });
 
   @override
   State<AddEditRecipeScreen> createState() => _AddEditRecipeScreenState();
@@ -21,134 +24,198 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _recipeInstructionsController = TextEditingController();
+  final _categoryController = TextEditingController();
 
   List<Map<String, dynamic>> _ingredients = [];
+  List<Map<String, dynamic>> _prepTasks = [];
 
   bool _isLoading = false;
-  bool get _isEditing => widget.recipeDocument != null;
+  bool _isActive = true;
+  late bool _isComponent;
+
+  bool get _isEditing => widget.dishDocument != null;
 
   @override
   void initState() {
     super.initState();
+    _isComponent = widget.isComponent;
+
     if (_isEditing) {
-      final data = widget.recipeDocument!.data() as Map<String, dynamic>;
+      final data = widget.dishDocument!.data() as Map<String, dynamic>;
       _nameController.text = data['dishName'] ?? '';
       _recipeInstructionsController.text = data['recipeInstructions'] ?? '';
-      _loadIngredients();
+      _categoryController.text = data['category'] ?? '';
+      _isComponent = data['isComponent'] ?? false;
+      _isActive = data['isActive'] ?? true;
+      _loadSubCollections();
     }
   }
 
-  Future<void> _loadIngredients() async {
+  Future<void> _loadSubCollections() async {
     if (!_isEditing) return;
-    final ingredientsSnapshot = await widget.recipeDocument!.reference.collection('ingredients').get();
-    if (!mounted) return;
-    final loadedIngredients = ingredientsSnapshot.docs.map((doc) {
-      final data = doc.data();
-      final inventoryItemId = (data['inventoryItemRef'] as DocumentReference).id;
-      return {'id': doc.id, 'inventoryItemId': inventoryItemId, 'quantity': data['quantity'], 'unitId': (data['unitId'] as DocumentReference?)?.id, 'type': data['type'] ?? 'quantified'};
-    }).toList();
+    final docRef = widget.dishDocument!.reference;
 
+    final ingredientsSnapshot = await docRef.collection('ingredients').get();
     if (mounted) {
       setState(() {
-        _ingredients = loadedIngredients;
+        _ingredients = ingredientsSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'inventoryItemRef': data['inventoryItemRef'] as DocumentReference,
+            'quantity': data['quantity'],
+            'unitRef': data['unitId'] as DocumentReference?,
+            'type': data['type'] ?? 'quantified'
+          };
+        }).toList();
+      });
+    }
+
+    final prepTasksSnapshot =
+    await docRef.collection('prepTasks').orderBy('order').get();
+    if (mounted) {
+      setState(() {
+        _prepTasks = prepTasksSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'taskName': data['taskName'],
+            'linkedDishRef': data['linkedDishRef'] as DocumentReference?,
+            'order': data['order'] ?? 0
+          };
+        }).toList();
       });
     }
   }
 
   Future<void> _showIngredientDialog({int? editIndex}) async {
     final bool isEditingIngredient = editIndex != null;
-    final Map<String, dynamic>? ingredientToEdit = isEditingIngredient ? _ingredients[editIndex!] : null;
+    final Map<String, dynamic>? ingredientToEdit =
+    isEditingIngredient ? _ingredients[editIndex!] : null;
 
-    String? selectedInventoryItemId = ingredientToEdit?['inventoryItemId'];
-    String? selectedUnitId = ingredientToEdit?['unitId'];
-    final quantityController = TextEditingController(text: ingredientToEdit?['quantity']?.toString() ?? '');
-    bool isOnHand = ingredientToEdit?['type'] == 'on-hand';
+    DocumentReference? selectedInventoryItemRef =
+    ingredientToEdit?['inventoryItemRef'];
+    DocumentReference? selectedUnitRef = ingredientToEdit?['unitRef'];
+    final quantityController =
+    TextEditingController(text: ingredientToEdit?['quantity']?.toString() ?? '');
+    String ingredientType = ingredientToEdit?['type'] ?? 'quantified';
 
-    Future<List<DocumentSnapshot>> getInventoryItems(String? filter) async {
-      final snapshot = await FirebaseFirestore.instance.collection('inventoryItems').orderBy('itemName').get();
-      return snapshot.docs;
+    DocumentSnapshot? initialItemDoc;
+    if (selectedInventoryItemRef != null) {
+      initialItemDoc = await selectedInventoryItemRef.get();
     }
 
-    DocumentSnapshot? selectedDoc;
-    if (isEditingIngredient && selectedInventoryItemId != null) {
-      final docGet = await FirebaseFirestore.instance.collection('inventoryItems').doc(selectedInventoryItemId).get();
-      if (docGet.exists) {
-        selectedDoc = docGet;
-      }
-    }
+    if (!mounted) return;
 
-    // Capture context before the async gap
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
-    final newItemData = await showDialog<Map<String, dynamic>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) {
         return StatefulBuilder(builder: (context, setDialogState) {
           return AlertDialog(
-            title: Text(isEditingIngredient ? "Edit Ingredient" : "Add Ingredient"),
+            title:
+            Text(isEditingIngredient ? "Edit Ingredient" : "Add Ingredient"),
             content: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                DropdownSearch<DocumentSnapshot>(
-                  asyncItems: getInventoryItems,
-                  itemAsString: (DocumentSnapshot doc) => (doc.data() as Map<String, dynamic>)['itemName'] as String,
-                  selectedItem: selectedDoc,
-                  popupProps: const PopupProps.menu(
-                    showSearchBox: true,
-                    searchFieldProps: TextFieldProps(decoration: InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), hintText: "Search for an ingredient...")),
-                    menuProps: MenuProps(elevation: 8),
-                  ),
-                  dropdownDecoratorProps: const DropDownDecoratorProps(
-                    dropdownSearchDecoration: InputDecoration(labelText: "Select Inventory Item", border: OutlineInputBorder()),
-                  ),
-                  onChanged: (DocumentSnapshot? newlySelectedDoc) async {
-                    if (newlySelectedDoc != null) {
-                      final data = newlySelectedDoc.data() as Map<String, dynamic>?;
-                      setDialogState(() {
-                        selectedInventoryItemId = newlySelectedDoc.id;
-                        selectedUnitId = (data?['unit'] as DocumentReference?)?.id;
-                      });
-                    }
-                  },
-                ),
-                CheckboxListTile(
-                  title: const Text("'On-Hand' Item?"),
-                  subtitle: const Text("(No specific quantity needed)"),
-                  value: isOnHand,
-                  onChanged: (newValue) => setDialogState(() => isOnHand = newValue ?? false),
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-                if (!isOnHand) ...[
-                  const SizedBox(height: 8),
-                  TextField(controller: quantityController, decoration: const InputDecoration(labelText: "Quantity"), keyboardType: const TextInputType.numberWithOptions(decimal: true)),
-                  const SizedBox(height: 16),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('units').orderBy('name').snapshots(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const SizedBox.shrink();
-                      final unitItems = snapshot.data!.docs.map((doc) => DropdownMenuItem<String>(value: doc.id, child: Text((doc.data() as Map<String, dynamic>)['name']))).toList();
-                      final bool unitExists = unitItems.any((item) => item.value == selectedUnitId);
-                      return DropdownButtonFormField<String>(
-                        value: unitExists ? selectedUnitId : null, hint: const Text("Select Unit"), items: unitItems,
-                        onChanged: (newValue) => setDialogState(() => selectedUnitId = newValue),
-                      );
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownSearch<DocumentSnapshot>(
+                    asyncItems: (String? filter) => FirebaseFirestore.instance
+                        .collection('inventoryItems')
+                        .orderBy('itemName')
+                        .get()
+                        .then((snapshot) => snapshot.docs),
+                    itemAsString: (DocumentSnapshot doc) =>
+                    (doc.data() as Map<String, dynamic>)['itemName']
+                    as String,
+                    selectedItem: initialItemDoc,
+                    popupProps: const PopupProps.menu(showSearchBox: true),
+                    dropdownDecoratorProps: const DropDownDecoratorProps(
+                      dropdownSearchDecoration: InputDecoration(
+                          labelText: "Select Inventory Item",
+                          border: OutlineInputBorder()),
+                    ),
+                    onChanged: (DocumentSnapshot? doc) {
+                      if (doc != null) {
+                        setDialogState(() {
+                          selectedInventoryItemRef = doc.reference;
+                          final data = doc.data() as Map<String, dynamic>?;
+                          selectedUnitRef = data?['unit'] as DocumentReference?;
+                        });
+                      }
                     },
                   ),
-                ]
-              ]),
+                  const SizedBox(height: 16),
+                  RadioListTile<String>(
+                    title: const Text('Quantified'),
+                    subtitle: const Text('Specific amount (e.g., 100g)'),
+                    value: 'quantified',
+                    groupValue: ingredientType,
+                    onChanged: (v) =>
+                        setDialogState(() => ingredientType = v ?? 'quantified'),
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('On-Hand'),
+                    subtitle: const Text('No specific amount needed'),
+                    value: 'on-hand',
+                    groupValue: ingredientType,
+                    onChanged: (v) =>
+                        setDialogState(() => ingredientType = v ?? 'on-hand'),
+                  ),
+                  if (ingredientType == 'quantified') ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: quantityController,
+                      decoration: const InputDecoration(
+                          labelText: "Quantity", border: OutlineInputBorder()),
+                      keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 16),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('units')
+                          .orderBy('name')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const SizedBox.shrink();
+                        final items = snapshot.data!.docs
+                            .map((doc) => DropdownMenuItem<DocumentReference>(
+                            value: doc.reference,
+                            child: Text((doc.data()
+                            as Map<String, dynamic>)['name'])))
+                            .toList();
+                        return DropdownButtonFormField<DocumentReference>(
+                          value: selectedUnitRef,
+                          hint: const Text("Select Unit"),
+                          items: items,
+                          onChanged: (ref) =>
+                              setDialogState(() => selectedUnitRef = ref),
+                          decoration:
+                          const InputDecoration(border: OutlineInputBorder()),
+                        );
+                      },
+                    ),
+                  ]
+                ],
+              ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Cancel")),
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("Cancel")),
               ElevatedButton(
                 child: const Text("Save"),
                 onPressed: () {
-                  bool isQuantifiedValid = !isOnHand && quantityController.text.isNotEmpty && selectedUnitId != null;
-                  bool isOnHandValid = isOnHand;
-                  if (selectedInventoryItemId != null && (isQuantifiedValid || isOnHandValid)) {
-                    Navigator.of(context).pop({'inventoryItemId': selectedInventoryItemId, 'quantity': isOnHand ? null : num.tryParse(quantityController.text) ?? 0, 'unitId': isOnHand ? null : selectedUnitId, 'type': isOnHand ? 'on-hand' : 'quantified'});
-                  } else {
-                    scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Please fill all required fields.")));
-                  }
+                  if (selectedInventoryItemRef == null) return;
+                  Navigator.of(context).pop({
+                    'inventoryItemRef': selectedInventoryItemRef,
+                    'quantity': ingredientType == 'quantified'
+                        ? num.tryParse(quantityController.text) ?? 0
+                        : null,
+                    'unitRef':
+                    ingredientType == 'quantified' ? selectedUnitRef : null,
+                    'type': ingredientType,
+                  });
                 },
               ),
             ],
@@ -156,55 +223,163 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
         });
       },
     );
-    if (newItemData != null && mounted) {
+
+    if (result != null && mounted) {
       setState(() {
         if (isEditingIngredient) {
-          _ingredients[editIndex!] = newItemData;
+          _ingredients[editIndex!] = result;
         } else {
-          _ingredients.add(newItemData);
+          _ingredients.add(result);
         }
       });
     }
   }
 
-  Future<void> _saveRecipe() async {
+  Future<void> _showPrepTaskDialog({int? index}) async {
+    final taskToEdit = (index != null) ? _prepTasks[index] : null;
+    final taskController =
+    TextEditingController(text: taskToEdit?['taskName'] ?? '');
+    DocumentReference? linkedDishRef = taskToEdit?['linkedDishRef'];
+
+    DocumentSnapshot? initialComponentDoc;
+    if (linkedDishRef != null) {
+      initialComponentDoc = await linkedDishRef.get();
+    }
+
+    if (!mounted) return;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(taskToEdit == null ? "Add Prep Step" : "Edit Prep Step"),
+        content: StatefulBuilder(builder: (context, setDialogState) {
+          return SingleChildScrollView(
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                      controller: taskController,
+                      decoration: const InputDecoration(labelText: "Step Name"),
+                      autofocus: true),
+                  const SizedBox(height: 24),
+                  const Text("Link to a Component (Optional)"),
+                  const SizedBox(height: 8),
+                  DropdownSearch<DocumentSnapshot>(
+                    asyncItems: (String? filter) => FirebaseFirestore.instance
+                        .collection('dishes').where('isComponent', isEqualTo: true).orderBy('dishName').get()
+                        .then((snapshot) => snapshot.docs),
+                    itemAsString: (DocumentSnapshot doc) => (doc.data() as Map<String, dynamic>)['dishName'] as String,
+                    selectedItem: initialComponentDoc,
+                    popupProps: const PopupProps.menu(showSearchBox: true),
+                    dropdownDecoratorProps: const DropDownDecoratorProps(
+                      dropdownSearchDecoration: InputDecoration(labelText: "Select Component", border: OutlineInputBorder()),
+                    ),
+                    onChanged: (doc) =>
+                        setDialogState(() => linkedDishRef = doc?.reference),
+                    clearButtonProps: const ClearButtonProps(isVisible: true),
+                  ),
+                ]),
+          );
+        }),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              if (taskController.text.trim().isNotEmpty) {
+                Navigator.of(context).pop({
+                  'taskName': taskController.text.trim(),
+                  'linkedDishRef': linkedDishRef
+                });
+              }
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        if (index == null) {
+          result['order'] = _prepTasks.length;
+          _prepTasks.add(result);
+        } else {
+          result['order'] = _prepTasks[index]['order'];
+          _prepTasks[index] = result;
+        }
+      });
+    }
+  }
+
+
+  Future<void> _saveDish() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; });
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    final recipeData = {
+    final dishData = {
       'dishName': _nameController.text.trim(),
+      'category': _categoryController.text.trim(),
       'recipeInstructions': _recipeInstructionsController.text.trim(),
-      'isComponent': true,
-      'isActive': true,
-      'category': '',
+      'isActive': _isActive,
+      'isComponent': _isComponent,
       'lastUpdated': FieldValue.serverTimestamp()
     };
     try {
-      DocumentReference recipeRef;
+      DocumentReference dishRef;
       if (_isEditing) {
-        recipeRef = widget.recipeDocument!.reference;
-        await recipeRef.update(recipeData);
+        dishRef = widget.dishDocument!.reference;
+        await dishRef.update(dishData);
       } else {
-        recipeRef = await FirebaseFirestore.instance.collection('dishes').add(recipeData);
+        dishRef =
+        await FirebaseFirestore.instance.collection('dishes').add(dishData);
       }
+
       final batch = FirebaseFirestore.instance.batch();
-      final oldIngredients = await recipeRef.collection('ingredients').get();
-      for (final doc in oldIngredients.docs) { batch.delete(doc.reference); }
-      for (final ingredient in _ingredients) {
-        final ingredientRef = recipeRef.collection('ingredients').doc();
-        final unitRef = ingredient['unitId'] != null ? FirebaseFirestore.instance.collection('units').doc(ingredient['unitId']) : null;
-        batch.set(ingredientRef, {'inventoryItemRef': FirebaseFirestore.instance.collection('inventoryItems').doc(ingredient['inventoryItemId']), 'quantity': ingredient['quantity'], 'unitId': unitRef, 'type': ingredient['type']});
+
+      final oldIngredients = await dishRef.collection('ingredients').get();
+      for (final doc in oldIngredients.docs) {
+        batch.delete(doc.reference);
       }
+      for (final ingredient in _ingredients) {
+        final ingredientRef = dishRef.collection('ingredients').doc();
+        batch.set(ingredientRef, {
+          'inventoryItemRef': ingredient['inventoryItemRef'],
+          'quantity': ingredient['quantity'],
+          'unitId': ingredient['unitRef'],
+          'type': ingredient['type']
+        });
+      }
+
+      final oldPrepTasks = await dishRef.collection('prepTasks').get();
+      for (final doc in oldPrepTasks.docs) {
+        batch.delete(doc.reference);
+      }
+      for (final task in _prepTasks) {
+        final taskRef = dishRef.collection('prepTasks').doc();
+        batch.set(taskRef, {
+          'taskName': task['taskName'],
+          'linkedDishRef': task['linkedDishRef'],
+          'order': task['order']
+        });
+      }
+
       await batch.commit();
 
-      scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Recipe saved successfully!")));
+      if (!navigator.mounted) return;
+      scaffoldMessenger.showSnackBar(const SnackBar(
+          content: Text("Saved successfully!"), backgroundColor: Colors.green));
       navigator.pop();
 
     } catch(e) {
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text("Failed to save recipe: $e")));
+      if(mounted) {
+        scaffoldMessenger.showSnackBar(SnackBar(content: Text("Failed to save: $e"), backgroundColor: Colors.red));
+      }
     } finally {
       if(mounted) setState(() { _isLoading = false; });
     }
@@ -213,6 +388,7 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _categoryController.dispose();
     _recipeInstructionsController.dispose();
     super.dispose();
   }
@@ -220,41 +396,189 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? "Edit Recipe" : "Create New Recipe"), actions: [IconButton(onPressed: _isLoading ? null : _saveRecipe, icon: const Icon(Icons.save), tooltip: "Save Recipe")]),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : SingleChildScrollView(
+      appBar: AppBar(
+          title: Text(_isEditing ? 'Edit' : 'Create New'),
+          actions: [
+            IconButton(
+                onPressed: _isLoading ? null : _saveDish,
+                icon: const Icon(Icons.save),
+                tooltip: "Save")
+          ]),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: "Recipe Name (e.g., Balsamic Vinaigrette)", border: OutlineInputBorder()), validator: (v) => (v == null || v.isEmpty) ? "Please enter a recipe name" : null),
+              TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                      labelText: _isComponent
+                          ? "Component Name"
+                          : "Dish Name"),
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? "Please enter a name"
+                      : null),
+              const SizedBox(height: 16),
+              if (!_isComponent)
+                TextFormField(
+                    controller: _categoryController,
+                    decoration: const InputDecoration(
+                        labelText: "Category (e.g., Antipasti)")),
+              const SizedBox(height: 16),
+              if (!_isComponent)
+                SwitchListTile(
+                  title: const Text("Is Active"),
+                  subtitle:
+                  const Text("Active dishes appear in standard lists."),
+                  value: _isActive,
+                  onChanged: (value) => setState(() => _isActive = value),
+                ),
               const SizedBox(height: 24),
-              _buildSectionHeader("Ingredients", () => _showIngredientDialog()),
+              _buildSectionHeader(
+                  "Ingredients", () => _showIngredientDialog()),
               _ingredients.isEmpty
-                  ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No ingredients added.")))
+                  ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: Center(child: Text("No ingredients added.")))
                   : ListView.builder(
-                shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: _ingredients.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _ingredients.length,
                 itemBuilder: (context, index) {
                   final ingredient = _ingredients[index];
-                  final bool isOnHand = ingredient['type'] == 'on-hand';
+                  final bool isOnHand =
+                      ingredient['type'] == 'on-hand';
                   return ListTile(
-                    title: FirestoreNameWidget(collection: 'inventoryItems', docId: ingredient['inventoryItemId'], fieldName: 'itemName'),
-                    subtitle: isOnHand ? const Text("On-Hand Item", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue)) : Row(mainAxisSize: MainAxisSize.min, children: [Text(ingredient['quantity'].toString()), const SizedBox(width: 4), FirestoreNameWidget(collection: 'units', docId: ingredient['unitId'])]),
+                    leading: const Icon(Icons.lunch_dining_outlined),
+                    title: FirestoreNameWidget(
+                        collection: 'inventoryItems',
+                        docId: (ingredient['inventoryItemRef']
+                        as DocumentReference)
+                            .id,
+                        fieldName: 'itemName'),
+                    subtitle: isOnHand
+                        ? const Text("On-Hand Item",
+                        style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Colors.blue))
+                        : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(ingredient['quantity']
+                              .toString()),
+                          const SizedBox(width: 4),
+                          FirestoreNameWidget(
+                              collection: 'units',
+                              docId: (ingredient['unitRef']
+                              as DocumentReference?)
+                                  ?.id)
+                        ]),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey), onPressed: () => _showIngredientDialog(editIndex: index)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _ingredients.removeAt(index))),
+                        IconButton(
+                            icon:
+                            const Icon(Icons.edit_outlined),
+                            onPressed: () =>
+                                _showIngredientDialog(
+                                    editIndex: index)),
+                        IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.red),
+                            onPressed: () => setState(
+                                    () => _ingredients.removeAt(index))),
                       ],
                     ),
                   );
                 },
               ),
               const SizedBox(height: 24),
-              const Text("Recipe Instructions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              if (!_isComponent) ...[
+                _buildSectionHeader(
+                    "Prep Steps", () => _showPrepTaskDialog()),
+                if (_prepTasks.isEmpty)
+                  const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                          child:
+                          Text("No steps or components added.")))
+                else
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _prepTasks.length,
+                    itemBuilder: (context, index) {
+                      final task = _prepTasks[index];
+                      return Card(
+                        key: ValueKey(task['id'] ?? task['taskName']),
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          leading: const Icon(Icons.drag_handle),
+                          title: Text(task['taskName'] ?? ''),
+                          subtitle: task['linkedDishRef'] != null
+                              ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.link, size: 12),
+                                const SizedBox(width: 4),
+                                FirestoreNameWidget(
+                                    collection: 'dishes',
+                                    docId:
+                                    (task['linkedDishRef']
+                                    as DocumentReference)
+                                        .id,
+                                    fieldName: 'dishName',
+                                    defaultText: "Linked Recipe")
+                              ])
+                              : null,
+                          trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                    icon: const Icon(
+                                        Icons.edit_outlined),
+                                    onPressed: () =>
+                                        _showPrepTaskDialog(
+                                            index: index)),
+                                IconButton(
+                                    icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red),
+                                    onPressed: () => setState(() =>
+                                        _prepTasks.removeAt(index))),
+                              ]),
+                        ),
+                      );
+                    },
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) {
+                          newIndex -= 1;
+                        }
+                        final item = _prepTasks.removeAt(oldIndex);
+                        _prepTasks.insert(newIndex, item);
+                        for (int i = 0; i < _prepTasks.length; i++) {
+                          _prepTasks[i]['order'] = i;
+                        }
+                      });
+                    },
+                  ),
+              ],
+              const SizedBox(height: 24),
+              const Text("Recipe Instructions",
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              TextFormField(controller: _recipeInstructionsController, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "1. Combine all ingredients..."), maxLines: 10),
+              TextFormField(
+                  controller: _recipeInstructionsController,
+                  decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: "1. Combine all ingredients..."),
+                  maxLines: 10),
             ],
           ),
         ),
@@ -263,6 +587,15 @@ class _AddEditRecipeScreenState extends State<AddEditRecipeScreen> {
   }
 
   Widget _buildSectionHeader(String title, VoidCallback onAdd) {
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), ElevatedButton.icon(onPressed: onAdd, icon: const Icon(Icons.add), label: const Text("Add"))]);
+    return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          ElevatedButton.icon(
+            // FIX: Corrected typo 'on onPressed' to 'onPressed'
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text("Add"))
+        ]);
   }
 }

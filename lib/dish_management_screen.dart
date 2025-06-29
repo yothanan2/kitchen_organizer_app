@@ -1,5 +1,5 @@
 // lib/dish_management_screen.dart
-// CORRECTED: Updated navigation to EditDishScreen to pass 'dishId' instead of 'dishDocument'.
+// CORRECTED: Updated navigation to EditDishScreen to pass 'dishDocument' instead of 'dishId'.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -157,15 +157,15 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
                             ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // UPDATED a parameter name here
-                            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishId: dishDoc.id)))),
+                            // FIX 1: Changed parameter name
+                            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishDocument: dishDoc)))),
                             IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _showDeleteConfirmation(dishDoc)),
                           ],
                         )
                             : null,
                         onTap: () {
-                          // UPDATED a parameter name here
-                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishId: dishDoc.id)));
+                          // FIX 2: Changed parameter name
+                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishDocument: dishDoc)));
                         },
                       ),
                     );
@@ -180,6 +180,7 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
           ? FloatingActionButton(
         onPressed: () {
           final bool isCreatingComponent = _currentFilter == DishFilter.components;
+          // We navigate to EditDishScreen to create a new one, passing the component flag.
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => EditDishScreen(isCreatingComponent: isCreatingComponent),

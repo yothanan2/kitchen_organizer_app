@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// UPDATED: Added the reusable WeatherCard widget to the dashboard.
+// UPDATED: Navigation for 'Dishes & Recipes' now points to the new UnifiedDishesScreen.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'dish_management_screen.dart';
 import 'user_management_screen.dart';
 import 'inventory_overview_screen.dart';
 import 'shopping_list_screen.dart';
@@ -15,7 +14,8 @@ import 'floor_checklist_items_screen.dart';
 import 'providers.dart';
 import 'butcher_requisition_screen.dart';
 import 'analytics_screen.dart';
-import 'widgets/weather_card_widget.dart'; // <-- NEW IMPORT
+import 'widgets/weather_card_widget.dart';
+import 'screens/admin/unified_dishes_screen.dart'; // <-- CHANGED IMPORT
 
 class AdminHomeScreen extends ConsumerWidget {
   final VoidCallback? onToggleView;
@@ -59,7 +59,6 @@ class AdminHomeScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.all(16.0),
           children: <Widget>[
-            // The WeatherCard is added here at the top.
             const WeatherCard(),
             const SizedBox(height: 16),
             _buildMetricCard(
@@ -82,7 +81,8 @@ class AdminHomeScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Dish Management', icon: Icons.restaurant_menu_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const DishManagementScreen()))),
+            // --- THIS IS THE MODIFIED BUTTON ---
+            _buildMenuButton(context, title: 'Dishes & Recipes', icon: Icons.restaurant_menu_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UnifiedDishesScreen()))),
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Inventory Management', icon: Icons.inventory_2_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen()))),
             const SizedBox(height: 12),

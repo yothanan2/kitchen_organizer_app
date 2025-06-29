@@ -1,9 +1,9 @@
 // lib/recipes_screen.dart
-// NEW FILE: A screen to manage reusable recipes/components.
+// FINAL FIX: Updated navigation to use the 'dishDocument' parameter.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'add_edit_recipe_screen.dart'; // We will create this screen next
+import 'add_edit_recipe_screen.dart';
 
 class RecipesScreen extends StatefulWidget {
   const RecipesScreen({super.key});
@@ -13,7 +13,6 @@ class RecipesScreen extends StatefulWidget {
 }
 
 class _RecipesScreenState extends State<RecipesScreen> {
-  // This function handles the deletion of a recipe and its sub-collections
   Future<void> _deleteRecipe(DocumentReference recipeRef) async {
     try {
       final batch = FirebaseFirestore.instance.batch();
@@ -23,8 +22,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
         batch.delete(doc.reference);
       }
 
-      // A recipe (component) doesn't have its own prep tasks in our new model,
-      // but it's safe to leave this here in case that changes.
       final prepTasksSnapshot = await recipeRef.collection('prepTasks').get();
       for (final doc in prepTasksSnapshot.docs) {
         batch.delete(doc.reference);
@@ -49,9 +46,9 @@ class _RecipesScreenState extends State<RecipesScreen> {
 
   Future<void> _showDeleteConfirmation(DocumentSnapshot recipeDoc) async {
     final recipeName = (recipeDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unnamed Recipe';
-
-    // We should also check if this recipe is being used as a prep task in any dish.
     final recipeRef = recipeDoc.reference;
+
+    // Check if this component is being used in any dishes.
     final linkedTasksQuery = await FirebaseFirestore.instance
         .collectionGroup('prepTasks')
         .where('linkedDishRef', isEqualTo: recipeRef)
@@ -101,7 +98,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
         title: const Text("Manage Recipes"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // This stream fetches only the documents marked as a component
         stream: FirebaseFirestore.instance.collection('dishes').where('isComponent', isEqualTo: true).orderBy('dishName').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -128,10 +124,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
                 child: ListTile(
                   title: Text(recipeName),
                   onTap: () {
-                    // Navigate to a screen to edit the recipe
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => AddEditRecipeScreen(recipeDocument: recipeDoc),
+                        // FIX 1: Changed 'recipeDocument' to 'dishDocument'
+                        builder: (context) => AddEditRecipeScreen(dishDocument: recipeDoc),
                       ),
                     );
                   },
@@ -143,7 +139,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) => AddEditRecipeScreen(recipeDocument: recipeDoc),
+                              // FIX 2: Changed 'recipeDocument' to 'dishDocument'
+                              builder: (context) => AddEditRecipeScreen(dishDocument: recipeDoc),
                             ),
                           );
                         },
@@ -162,10 +159,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Navigate to a screen to add a new recipe
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => const AddEditRecipeScreen(),
+              // When creating a new recipe, we must specify it IS a component.
+              builder: (context) => const AddEditRecipeScreen(isComponent: true),
             ),
           );
         },

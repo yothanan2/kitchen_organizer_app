@@ -1,5 +1,5 @@
 // lib/floor_staff_dashboard_screen.dart
-// FINAL CORRECTION: Restored the correct navigation logic to the correct screen.
+// UPDATED: Added the reusable DailyNoteCard widget.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,9 +9,9 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 
 import 'providers.dart';
-import 'floor_staff_confirmation_screen.dart'; // Correct import
+import 'floor_staff_confirmation_screen.dart';
 import 'widgets/weather_card_widget.dart';
-import 'widgets/daily_note_card_widget.dart';
+import 'widgets/daily_note_card_widget.dart'; // <-- NEW IMPORT
 
 class FloorChecklistItem {
   final String id;
@@ -114,7 +114,6 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
     return DateTime.now().hour >= 22 && (tomorrowsItems.valueOrNull?.isEmpty ?? true);
   }
 
-  // --- THIS IS THE CORRECTED METHOD ---
   void _navigateToConfirmationScreen() async {
     final itemsToActuallyReport = _selectedForReportingIds.toSet();
     final alreadyReported = ref.read(tomorrowsFloorStaffPrepTasksProvider).value ?? {};
@@ -129,13 +128,11 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
 
     setState(() { _isSending = true; });
 
-    // The 'reportDate' is now used again.
     final reportDate = DateTime.now().add(const Duration(days: 1));
 
     try {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          // Navigating to the correct screen with the correct parameters.
           builder: (context) => FloorStaffConfirmationScreen(
             selectedItemIds: itemsToActuallyReport,
             reportDate: reportDate,
@@ -192,6 +189,7 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
                   children: [
                     const WeatherCard(),
                     const SizedBox(height: 16),
+                    // NEW: Added the daily note card for floor staff
                     const DailyNoteCard(noteFieldName: 'forFloorStaff'),
                     const _KitchenNoteCard(),
                     _PreviouslyReportedItemsCard(tomorrowsItems: tomorrowsReportedItemsAsync),
