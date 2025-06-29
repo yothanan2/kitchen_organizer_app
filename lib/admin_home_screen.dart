@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// FINAL CORRECTION: Using the correct signature for PopScope's onPopInvoked callback.
+// UPDATED: Added the reusable WeatherCard widget to the dashboard.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +15,7 @@ import 'floor_checklist_items_screen.dart';
 import 'providers.dart';
 import 'butcher_requisition_screen.dart';
 import 'analytics_screen.dart';
+import 'widgets/weather_card_widget.dart'; // <-- NEW IMPORT
 
 class AdminHomeScreen extends ConsumerWidget {
   final VoidCallback? onToggleView;
@@ -28,7 +29,6 @@ class AdminHomeScreen extends ConsumerWidget {
 
     return PopScope(
       canPop: false,
-      // THIS IS THE CORRECTED SECTION
       onPopInvoked: (bool didPop) {
         if (didPop) return;
         showDialog<bool>(
@@ -59,6 +59,9 @@ class AdminHomeScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.all(16.0),
           children: <Widget>[
+            // The WeatherCard is added here at the top.
+            const WeatherCard(),
+            const SizedBox(height: 16),
             _buildMetricCard(
               context: context,
               title: 'Pending Approvals',
