@@ -1,3 +1,6 @@
+// lib/models/models.dart
+// UPDATED: Added missing fields to the InventoryItem model.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // A base class to ensure all simple lookup models have an ID and a name.
@@ -61,6 +64,9 @@ class InventoryItem {
   final String id;
   final String itemName;
   final bool isButcherItem;
+  final num quantityOnHand;
+  final num minStockLevel;
+  final Timestamp? lastUpdated;
   // These fields are DocumentReferences to maintain data integrity.
   final DocumentReference? supplier;
   final DocumentReference? category;
@@ -71,6 +77,9 @@ class InventoryItem {
     required this.id,
     required this.itemName,
     required this.isButcherItem,
+    required this.quantityOnHand,
+    required this.minStockLevel,
+    this.lastUpdated,
     this.supplier,
     this.category,
     this.location,
@@ -82,6 +91,9 @@ class InventoryItem {
       id: documentId,
       itemName: data['itemName'] ?? 'Unnamed Item',
       isButcherItem: data['isButcherItem'] ?? false,
+      quantityOnHand: data['quantityOnHand'] ?? 0,
+      minStockLevel: data['minStockLevel'] ?? 0,
+      lastUpdated: data['lastUpdated'] as Timestamp?,
       supplier: data['supplier'] as DocumentReference?,
       category: data['category'] as DocumentReference?,
       location: data['location'] as DocumentReference?,

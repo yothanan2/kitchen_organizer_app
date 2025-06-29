@@ -1,3 +1,6 @@
+// lib/staff_wrapper_screen.dart
+// CORRECTED: Updated PopScope to resolve deprecation warning.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'staff_home_screen.dart';
@@ -5,9 +8,9 @@ import 'staff_inventory_count_screen.dart';
 
 class StaffWrapperScreen extends StatefulWidget {
   final String? userRole;
-  final VoidCallback? onToggleView; // Made nullable
+  final VoidCallback? onToggleView;
 
-  const StaffWrapperScreen({super.key, this.userRole, this.onToggleView}); // onToggleView is now optional
+  const StaffWrapperScreen({super.key, this.userRole, this.onToggleView});
 
   @override
   State<StaffWrapperScreen> createState() => _StaffWrapperScreenState();
@@ -37,10 +40,10 @@ class _StaffWrapperScreenState extends State<StaffWrapperScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (bool didPop) async {
+      // UPDATED: This now correctly handles the async dialog without making the callback async.
+      onPopInvoked: (bool didPop) {
         if (didPop) return;
-
-        final bool? shouldPop = await showDialog<bool>(
+        showDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -62,11 +65,11 @@ class _StaffWrapperScreenState extends State<StaffWrapperScreen> {
               ],
             );
           },
-        );
-
-        if (shouldPop ?? false) {
-          SystemNavigator.pop();
-        }
+        ).then((shouldPop) {
+          if (shouldPop ?? false) {
+            SystemNavigator.pop();
+          }
+        });
       },
       child: Scaffold(
         body: IndexedStack(

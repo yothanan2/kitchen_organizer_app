@@ -1,57 +1,23 @@
 // lib/inventory_management_screen.dart
+// REFACTORED: Removed the local data model and now uses the central one from models.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // For date formatting if needed
+import 'package:intl/intl.dart';
 
-import 'providers.dart'; // Ensure providers.dart is correctly imported
-import 'add_edit_inventory_item_screen.dart'; // Assuming you have this screen
+import 'providers.dart';
+import 'add_edit_inventory_item_screen.dart';
+import 'models/models.dart'; // <-- IMPORT the central models
 
-// Data model for Inventory Item (can be shared with other files)
-class InventoryItem {
-  final String id;
-  final String itemName;
-  final num quantityOnHand;
-  final DocumentReference? unitRef;
-  final DocumentReference? categoryRef;
-  final DocumentReference? supplierRef;
-  final DocumentReference? locationRef;
-  final bool isButcherItem; // Added this field
-  final Timestamp? lastUpdated;
+// The local InventoryItem class has been removed from this file.
 
-  InventoryItem({
-    required this.id,
-    required this.itemName,
-    required this.quantityOnHand,
-    this.unitRef,
-    this.categoryRef,
-    this.supplierRef,
-    this.locationRef,
-    this.isButcherItem = false, // Default to false
-    this.lastUpdated,
-  });
-
-  factory InventoryItem.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return InventoryItem(
-      id: doc.id,
-      itemName: data['itemName'] as String? ?? 'Unnamed Item',
-      quantityOnHand: data['quantityOnHand'] as num? ?? 0,
-      unitRef: data['unit'] as DocumentReference?,
-      categoryRef: data['category'] as DocumentReference?,
-      supplierRef: data['supplier'] as DocumentReference?,
-      locationRef: data['location'] as DocumentReference?,
-      isButcherItem: data['isButcherItem'] as bool? ?? false, // Read the new field
-      lastUpdated: data['lastUpdated'] as Timestamp?,
-    );
-  }
-}
-
-// Provider to fetch all inventory items
+// Provider to fetch all inventory items using the central model.
 final allInventoryItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore.collection('inventoryItems').snapshots().map((snapshot) {
-    return snapshot.docs.map((doc) => InventoryItem.fromFirestore(doc)).toList();
+    // Map the documents to the central InventoryItem model
+    return snapshot.docs.map((doc) => InventoryItem.fromFirestore(doc.data(), doc.id)).toList();
   });
 });
 
@@ -84,10 +50,10 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
 
   void _filterItems() {
     final query = _searchController.text.toLowerCase();
-    final allItems = ref.read(allInventoryItemsProvider).value ?? []; // Safely get value
+    final allItems = ref.read(allInventoryItemsProvider).value ?? [];
     setState(() {
       _filteredItems = allItems.where((item) => item.itemName.toLowerCase().contains(query)).toList();
-      _sortItems(); // Re-sort after filtering
+      _sortItems();
     });
   }
 
@@ -110,7 +76,6 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
             valA = a.lastUpdated?.toDate().millisecondsSinceEpoch ?? 0;
             valB = b.lastUpdated?.toDate().millisecondsSinceEpoch ?? 0;
             break;
-        // Add more cases for other sortable columns like category, supplier etc. if displaying
           default:
             valA = a.itemName.toLowerCase();
             valB = b.itemName.toLowerCase();
@@ -123,7 +88,6 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
   }
 
   Future<void> _deleteItem(String itemId) async {
-    // Show confirmation dialog before deleting
     final bool confirm = await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -143,9 +107,9 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
           ],
         );
       },
-    ) ?? false; // In case dialog is dismissed by tapping outside
+    ) ?? false;
 
-    if (!confirm) return; // If user cancels, do nothing
+    if (!confirm) return;
 
     final firestore = ref.read(firestoreProvider);
     try {
@@ -174,8 +138,6 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
 
   @override
   Widget build(BuildContext context) {
-    // Watch all inventory items. When data changes, _filterItems is called via listener.
-    // Initial data load for _filteredItems is handled by _filterItems when it's first run or when data changes.
     final asyncInventoryItems = ref.watch(allInventoryItemsProvider);
     final unitsMapAsync = ref.watch(unitsMapProvider);
     final categoriesMapAsync = ref.watch(categoriesMapProvider);
@@ -214,19 +176,12 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
             loading: () => const LinearProgressIndicator(),
             error: (err, stack) => Center(child: Text('Error loading inventory: $err')),
             data: (items) {
-              // This ensures _filteredItems is updated whenever source 'items' change
-              // and the search query is applied.
               if (_searchController.text.isEmpty && _filteredItems.isEmpty) {
-                // Initial load or search cleared
                 _filteredItems = items;
                 _sortItems();
               } else if (_searchController.text.isNotEmpty) {
-                // Re-filter if search query exists
                 _filterItems();
               } else {
-                // If search is empty but _filteredItems might be stale from a previous filter,
-                // re-assign and re-sort from the full list.
-                // This handles cases where items are added/deleted while search is empty.
                 final currentFilteredIds = _filteredItems.map((e) => e.id).toSet();
                 final newItemsIds = items.map((e) => e.id).toSet();
                 if (currentFilteredIds.length != newItemsIds.length || !currentFilteredIds.containsAll(newItemsIds)) {
@@ -234,7 +189,6 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
                   _sortItems();
                 }
               }
-
 
               if (_filteredItems.isEmpty) {
                 return const Expanded(
@@ -278,15 +232,9 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
                           });
                         },
                       ),
-                      DataColumn(
-                        label: const Text('Unit'),
-                      ),
-                      DataColumn(
-                        label: const Text('Category'),
-                      ),
-                      DataColumn(
-                        label: const Text('Location'),
-                      ),
+                      const DataColumn(label: Text('Unit')),
+                      const DataColumn(label: Text('Category')),
+                      const DataColumn(label: Text('Location')),
                       DataColumn(
                         label: const Text('Last Updated'),
                         onSort: (columnIndex, ascending) {
@@ -302,16 +250,13 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
                     rows: _filteredItems.map((item) {
                       final unitsMap = unitsMapAsync.value ?? {};
                       final categoriesMap = categoriesMapAsync.value ?? {};
-                      final suppliersMap = suppliersMapAsync.value ?? {};
                       final locationsMap = locationsMapAsync.value ?? {};
 
-                      final unitName = unitsMap[item.unitRef?.id] ?? 'N/A';
-                      final categoryName = categoriesMap[item.categoryRef?.id] ?? 'N/A';
-                      final supplierName = suppliersMap[item.supplierRef?.id] ?? 'N/A'; // Not displayed in current columns but useful for debugging
-                      final locationName = locationsMap[item.locationRef?.id] ?? 'N/A';
+                      final unitName = unitsMap[item.unit?.id] ?? 'N/A';
+                      final categoryName = categoriesMap[item.category?.id] ?? 'N/A';
+                      final locationName = locationsMap[item.location?.id] ?? 'N/A';
                       final lastUpdatedDate = item.lastUpdated?.toDate();
                       final formattedDate = lastUpdatedDate != null ? DateFormat('MMM d, yy HH:mm').format(lastUpdatedDate) : 'N/A';
-
 
                       return DataRow(
                         cells: [

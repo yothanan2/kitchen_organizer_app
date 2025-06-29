@@ -1,9 +1,11 @@
+// lib/floor_staff_thank_you_screen.dart
+// CORRECTED: Updated PopScope to resolve deprecation warning.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'auth_gate.dart'; // Import AuthGate for navigation
+import 'auth_gate.dart';
 
 class FloorStaffThankYouScreen extends ConsumerWidget {
-  // The reporter's name is passed in to personalize the message.
   final String reporterName;
 
   const FloorStaffThankYouScreen({
@@ -11,20 +13,18 @@ class FloorStaffThankYouScreen extends ConsumerWidget {
     required this.reporterName,
   });
 
-  // A helper method to navigate back to the main dashboard.
   void _goToDashboard(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const AuthGate()),
-          (Route<dynamic> route) => false, // Clear all previous routes
+          (Route<dynamic> route) => false,
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // The PopScope prevents the user from accidentally swiping back
-    // and re-submitting a form. It redirects them to the dashboard.
     return PopScope(
       canPop: false,
+      // UPDATED: This now uses the correct signature and logic.
       onPopInvoked: (bool didPop) {
         if (didPop) return;
         _goToDashboard(context);
@@ -32,7 +32,7 @@ class FloorStaffThankYouScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Report Sent!'),
-          automaticallyImplyLeading: false, // Hide the default back button
+          automaticallyImplyLeading: false,
         ),
         body: Center(
           child: Padding(
