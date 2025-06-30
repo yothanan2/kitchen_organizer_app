@@ -1,9 +1,8 @@
 // lib/models/models.dart
-// UPDATED: Added comprehensive models for Dish, Ingredient, and PrepTask.
+// UPDATED: Added robust copyWith methods to Dish and PrepTask models.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// A base class to ensure all simple lookup models have an ID and a name.
 abstract class BaseModel {
   final String id;
   final String name;
@@ -11,7 +10,6 @@ abstract class BaseModel {
   const BaseModel({required this.id, required this.name});
 }
 
-// Represents a document in the 'suppliers' collection.
 class Supplier extends BaseModel {
   Supplier({required super.id, required super.name});
 
@@ -23,7 +21,6 @@ class Supplier extends BaseModel {
   }
 }
 
-// Represents a document in the 'categories' collection.
 class Category extends BaseModel {
   Category({required super.id, required super.name});
 
@@ -35,7 +32,6 @@ class Category extends BaseModel {
   }
 }
 
-// Represents a document in the 'locations' collection.
 class Location extends BaseModel {
   Location({required super.id, required super.name});
 
@@ -47,7 +43,6 @@ class Location extends BaseModel {
   }
 }
 
-// Represents a document in the 'units' collection.
 class Unit extends BaseModel {
   Unit({required super.id, required super.name});
 
@@ -59,7 +54,6 @@ class Unit extends BaseModel {
   }
 }
 
-// Represents a document in the 'inventoryItems' collection.
 class InventoryItem {
   final String id;
   final String itemName;
@@ -85,7 +79,8 @@ class InventoryItem {
     this.unit,
   });
 
-  factory InventoryItem.fromFirestore(Map<String, dynamic> data, String documentId) {
+  factory InventoryItem.fromFirestore(
+      Map<String, dynamic> data, String documentId) {
     return InventoryItem(
       id: documentId,
       itemName: data['itemName'] ?? 'Unnamed Item',
@@ -101,15 +96,12 @@ class InventoryItem {
   }
 }
 
-// --- NEWLY ADDED MODELS FOR DISHES ---
-
-// Represents a single ingredient within a Dish's subcollection.
 class Ingredient {
   final String id;
   final DocumentReference inventoryItemRef;
   final DocumentReference? unitId;
   final num? quantity;
-  final String type; // 'quantified' or 'on-hand'
+  final String type;
 
   Ingredient({
     required this.id,
@@ -119,7 +111,8 @@ class Ingredient {
     required this.type,
   });
 
-  factory Ingredient.fromFirestore(Map<String, dynamic> data, String documentId) {
+  factory Ingredient.fromFirestore(
+      Map<String, dynamic> data, String documentId) {
     return Ingredient(
       id: documentId,
       inventoryItemRef: data['inventoryItemRef'] as DocumentReference,
@@ -130,7 +123,6 @@ class Ingredient {
   }
 }
 
-// Represents a single prep task within a Dish's subcollection.
 class PrepTask {
   final String id;
   final String taskName;
@@ -152,9 +144,23 @@ class PrepTask {
       order: data['order'] ?? 0,
     );
   }
+
+  // FIX: Added the missing copyWith method
+  PrepTask copyWith({
+    String? id,
+    String? taskName,
+    DocumentReference? linkedDishRef,
+    int? order,
+  }) {
+    return PrepTask(
+      id: id ?? this.id,
+      taskName: taskName ?? this.taskName,
+      linkedDishRef: linkedDishRef ?? this.linkedDishRef,
+      order: order ?? this.order,
+    );
+  }
 }
 
-// Represents a main Dish document.
 class Dish {
   final String id;
   final String dishName;
@@ -163,7 +169,6 @@ class Dish {
   final bool isActive;
   final bool isComponent;
   final Timestamp? lastUpdated;
-  // This will hold the subcollection data after we fetch it.
   final List<Ingredient> ingredients;
   final List<PrepTask> prepTasks;
 
@@ -191,18 +196,23 @@ class Dish {
     );
   }
 
-  // A helper method to create a new copy of a Dish with updated subcollections.
+  // FIX: Upgraded the copyWith method to handle all fields
   Dish copyWith({
+    String? dishName,
+    String? category,
+    String? recipeInstructions,
+    bool? isActive,
+    bool? isComponent,
     List<Ingredient>? ingredients,
     List<PrepTask>? prepTasks,
   }) {
     return Dish(
       id: id,
-      dishName: dishName,
-      category: category,
-      recipeInstructions: recipeInstructions,
-      isActive: isActive,
-      isComponent: isComponent,
+      dishName: dishName ?? this.dishName,
+      category: category ?? this.category,
+      recipeInstructions: recipeInstructions ?? this.recipeInstructions,
+      isActive: isActive ?? this.isActive,
+      isComponent: isComponent ?? this.isComponent,
       lastUpdated: lastUpdated,
       ingredients: ingredients ?? this.ingredients,
       prepTasks: prepTasks ?? this.prepTasks,

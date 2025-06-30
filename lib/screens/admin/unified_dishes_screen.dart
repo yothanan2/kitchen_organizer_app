@@ -1,9 +1,9 @@
 // lib/screens/admin/unified_dishes_screen.dart
-// VERSION 2: Corrected import path and usage of BuildContext across async gaps.
+// FINAL STABLE VERSION
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../add_edit_recipe_screen.dart'; // <-- FIX 1: Corrected path
+import '../../edit_dish_screen.dart'; // Corrected navigation target
 
 class UnifiedDishesScreen extends StatelessWidget {
   const UnifiedDishesScreen({super.key});
@@ -36,7 +36,7 @@ class UnifiedDishesScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) =>
-                      AddEditRecipeScreen(isComponent: isComponent),
+                      EditDishScreen(isComponent: isComponent),
                 ),
               );
             },
@@ -66,12 +66,10 @@ class _DishList extends StatelessWidget {
     final dishName =
         (dishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown';
 
-    // <-- FIX 2: Capture context-dependent objects before the async gap.
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final theme = Theme.of(context);
 
-    // Safety Check: If it's a component, check if it's being used.
     if (isComponent) {
       final linkedTasksQuery = await FirebaseFirestore.instance
           .collectionGroup('prepTasks')
@@ -79,7 +77,6 @@ class _DishList extends StatelessWidget {
           .limit(1)
           .get();
 
-      // Check if the widget is still mounted before showing a dialog.
       if (!navigator.mounted) return;
 
       if (linkedTasksQuery.docs.isNotEmpty) {
@@ -115,14 +112,13 @@ class _DishList extends StatelessWidget {
               style:
               ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
               onPressed: () => navigator.pop(true),
-              child: const Text("Delete"),
+              child: const Text("Delete", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
       },
     );
 
-    // Check if the widget is still mounted before proceeding.
     if (!navigator.mounted) return;
 
     if (confirmed == true) {
@@ -183,7 +179,7 @@ class _DishList extends StatelessWidget {
 
         final items = snapshot.data!.docs;
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 80), // Space for the FAB
+          padding: const EdgeInsets.only(bottom: 80),
           itemCount: items.length,
           itemBuilder: (context, index) {
             final doc = items[index];
@@ -200,7 +196,7 @@ class _DishList extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) =>
-                          AddEditRecipeScreen(dishDocument: doc),
+                          EditDishScreen(dishId: doc.id),
                     ),
                   );
                 },
@@ -214,7 +210,7 @@ class _DishList extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) =>
-                                AddEditRecipeScreen(dishDocument: doc),
+                                EditDishScreen(dishId: doc.id),
                           ),
                         );
                       },
