@@ -1,9 +1,10 @@
 // lib/screens/admin/unified_dishes_screen.dart
-// FINAL STABLE VERSION
+// FINAL CORRECTION: Updated navigation to EditDishScreen to use the new constructor.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../edit_dish_screen.dart'; // Corrected navigation target
+import '../../edit_dish_screen.dart';
+import '../../models/models.dart'; // <-- NEW IMPORT
 
 class UnifiedDishesScreen extends StatelessWidget {
   const UnifiedDishesScreen({super.key});
@@ -32,11 +33,12 @@ class UnifiedDishesScreen extends StatelessWidget {
           return FloatingActionButton(
             onPressed: () {
               final int currentIndex = DefaultTabController.of(context).index;
-              final bool isComponent = currentIndex == 1;
+              final bool isCreatingComponent = currentIndex == 1;
               Navigator.of(context).push(
                 MaterialPageRoute(
+                  // UPDATED: Corrected parameter name
                   builder: (context) =>
-                      EditDishScreen(isComponent: isComponent),
+                      EditDishScreen(isCreatingComponent: isCreatingComponent),
                 ),
               );
             },
@@ -66,6 +68,7 @@ class _DishList extends StatelessWidget {
     final dishName =
         (dishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown';
 
+    // Capture context-sensitive objects before async gaps
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final theme = Theme.of(context);
@@ -77,9 +80,9 @@ class _DishList extends StatelessWidget {
           .limit(1)
           .get();
 
-      if (!navigator.mounted) return;
-
       if (linkedTasksQuery.docs.isNotEmpty) {
+        // Use the captured navigator context
+        if (!navigator.mounted) return;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -118,8 +121,6 @@ class _DishList extends StatelessWidget {
         );
       },
     );
-
-    if (!navigator.mounted) return;
 
     if (confirmed == true) {
       try {
@@ -183,20 +184,19 @@ class _DishList extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final doc = items[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final name = data['dishName'] ?? 'Unnamed';
-            final category = data['category'] ?? 'No Category';
+            // Create a Dish model object from the document data
+            final dish = Dish.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
 
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: ListTile(
-                title: Text(name),
-                subtitle: Text(category),
+                title: Text(dish.dishName),
+                subtitle: Text(dish.category),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) =>
-                          EditDishScreen(dishId: doc.id),
+                      // UPDATED: Pass the Dish object
+                      builder: (context) => EditDishScreen(dish: dish),
                     ),
                   );
                 },
@@ -209,8 +209,8 @@ class _DishList extends StatelessWidget {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) =>
-                                EditDishScreen(dishId: doc.id),
+                            // UPDATED: Pass the Dish object
+                            builder: (context) => EditDishScreen(dish: dish),
                           ),
                         );
                       },

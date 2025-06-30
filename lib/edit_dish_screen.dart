@@ -33,6 +33,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
   void initState() {
     super.initState();
     // Use a listener to populate controllers once the initial dish data is loaded.
+    // This ensures we don't overwrite user input during rebuilds.
     ref.listenManual<EditDishState>(
       editDishControllerProvider(widget.dish),
           (previous, next) {
@@ -55,21 +56,18 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
     super.dispose();
   }
 
-  // The ingredient dialog can stay in the UI file for now.
-  // It will call the controller to update the state.
   Future<void> _showIngredientDialog() async {
+    // The dialog logic remains in the UI, but it calls the controller to update state.
     String? selectedInventoryItemId;
     String? selectedUnitId;
     final quantityController = TextEditingController();
     bool isOnHand = false;
 
     Future<List<DocumentSnapshot>> getInventoryItems(String? filter) async {
-      final snapshot = await FirebaseFirestore.instance.collection('inventoryItems').orderBy('itemName').get();
-      return snapshot.docs;
+      return (await FirebaseFirestore.instance.collection('inventoryItems').orderBy('itemName').get()).docs;
     }
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
 
     final newItemData = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -81,12 +79,12 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 DropdownSearch<DocumentSnapshot>(
                   asyncItems: getInventoryItems,
-                  itemAsString: (DocumentSnapshot doc) => (doc.data() as Map<String, dynamic>)['itemName'] as String,
+                  itemAsString: (doc) => (doc.data() as Map<String, dynamic>)['itemName'],
                   popupProps: const PopupProps.menu(showSearchBox: true),
                   dropdownDecoratorProps: const DropDownDecoratorProps(
                     dropdownSearchDecoration: InputDecoration(labelText: "Select Inventory Item"),
                   ),
-                  onChanged: (DocumentSnapshot? newlySelectedDoc) {
+                  onChanged: (newlySelectedDoc) {
                     if (newlySelectedDoc != null) {
                       final data = newlySelectedDoc.data() as Map<String, dynamic>?;
                       setDialogState(() {
@@ -103,18 +101,18 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                 ),
                 if (!isOnHand) ...[
                   TextField(controller: quantityController, decoration: const InputDecoration(labelText: "Quantity"), keyboardType: TextInputType.number),
-                  // Unit dropdown would go here...
+                  // In a future step, we could make this unit dropdown more robust
                 ]
               ]),
             ),
             actions: [
-              TextButton(onPressed: () => navigator.pop(), child: const Text("Cancel")),
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Cancel")),
               ElevatedButton(
                 child: const Text("Save"),
                 onPressed: () {
-                  bool isValid = selectedInventoryItemId != null && (isOnHand || (quantityController.text.isNotEmpty && selectedUnitId != null));
+                  bool isValid = selectedInventoryItemId != null && (isOnHand || (quantityController.text.isNotEmpty /* && selectedUnitId != null */));
                   if (isValid) {
-                    navigator.pop({
+                    Navigator.of(context).pop({
                       'inventoryItemId': selectedInventoryItemId,
                       'quantity': isOnHand ? null : num.tryParse(quantityController.text),
                       'unitId': isOnHand ? null : selectedUnitId,
@@ -134,6 +132,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
       ref.read(editDishControllerProvider(widget.dish).notifier).addIngredient(newItemData);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +155,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                   onPressed: () async {
                     if (!_formKey.currentState!.validate()) return;
 
+                    // First, update the controller with any text changes from the form fields
                     controller.updateDetails(
                       dishName: _dishNameController.text,
                       category: _categoryController.text,
@@ -196,7 +196,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                   Card(
                     child: SwitchListTile(
                       title: const Text("Is a Component"),
-                      subtitle: const Text("Can be used as an ingredient in other dishes."),
+                      subtitle: const Text("Can be used in other recipes."),
                       value: dish.isComponent,
                       onChanged: (value) => controller.updateDetails(isComponent: value),
                     ),
@@ -205,7 +205,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                     Card(
                       child: SwitchListTile(
                         title: const Text("Is Active"),
-                        subtitle: const Text("Appears on menus and prep lists."),
+                        subtitle: const Text("Appears on menus and lists."),
                         value: dish.isActive,
                         onChanged: (value) => controller.updateDetails(isActive: value),
                       ),
@@ -215,7 +215,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Ingredients", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text("Ingredients", style: Theme.of(context).textTheme.titleMedium),
                       ElevatedButton.icon(onPressed: _showIngredientDialog, icon: const Icon(Icons.add), label: const Text("Add"))
                     ],
                   ),
@@ -228,7 +228,8 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                   }),
 
                   const SizedBox(height: 24),
-                  const Text("Recipe Instructions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text("Recipe Instructions", style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _recipeInstructionsController,
                     decoration: const InputDecoration(border: OutlineInputBorder()),

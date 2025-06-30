@@ -1,9 +1,10 @@
 // lib/dish_management_screen.dart
-// FINAL STABLE VERSION: Corrected all remaining issues.
+// CORRECTED: Updated navigation to EditDishScreen to pass the correct parameters.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'edit_dish_screen.dart';
+import 'package:kitchen_organizer_app/edit_dish_screen.dart';
+import 'package:kitchen_organizer_app/models/models.dart'; // <-- NEW IMPORT
 
 enum DishFilter { active, all, components }
 
@@ -17,7 +18,38 @@ class DishManagementScreen extends StatefulWidget {
 class _DishManagementScreenState extends State<DishManagementScreen> {
   DishFilter _currentFilter = DishFilter.active;
 
-  // This method is no longer called in the UI, but we keep it for reference.
+  Future<void> _toggleActiveStatus(DocumentReference dishRef, bool currentStatus) async {
+    try {
+      await dishRef.update({'isActive': !currentStatus});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error updating status: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDish(DocumentReference dishRef) async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final ingredientsSnapshot = await dishRef.collection('ingredients').get();
+      for (final doc in ingredientsSnapshot.docs) { batch.delete(doc.reference); }
+      final prepTasksSnapshot = await dishRef.collection('prepTasks').get();
+      for (final doc in prepTasksSnapshot.docs) { batch.delete(doc.reference); }
+      batch.delete(dishRef);
+      await batch.commit();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Dish deleted successfully"), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error deleting dish: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _showDeleteConfirmation(DocumentSnapshot dishDoc) async {
     final dishName = (dishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unnamed Dish';
     final bool? confirmed = await showDialog<bool>(
@@ -34,13 +66,10 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
       },
     );
     if (confirmed == true) {
-      // The delete logic was removed as it was part of the unused _deleteDish method.
-      // In a real scenario, you'd call the delete logic here.
-      // For now, this is sufficient to make the code compile.
+      await _deleteDish(dishDoc.reference);
     }
   }
 
-  // FIX: Added a default case to the switch to handle all paths.
   Stream<QuerySnapshot> _getStream() {
     Query query = FirebaseFirestore.instance.collection('dishes');
     switch (_currentFilter) {
@@ -50,9 +79,6 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
         return query.where('isComponent', isEqualTo: false).orderBy('dishName').snapshots();
       case DishFilter.components:
         return query.where('isComponent', isEqualTo: true).orderBy('dishName').snapshots();
-      default:
-      // Return a default stream to satisfy the non-nullable return type.
-        return query.where('isComponent', isEqualTo: false).orderBy('dishName').snapshots();
     }
   }
 
@@ -103,25 +129,40 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
                   itemCount: dishes.length,
                   itemBuilder: (context, index) {
                     final dishDoc = dishes[index];
-                    final data = dishDoc.data() as Map<String, dynamic>;
-                    final dishName = data['dishName'] ?? 'Unnamed Dish';
-                    final category = data['category'] ?? 'No Category';
-                    final bool isActive = data['isActive'] ?? true;
+                    final dish = Dish.fromFirestore(dishDoc.data() as Map<String, dynamic>, dishDoc.id);
+                    final bool isActive = dish.isActive;
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: ListTile(
-                        title: Text(dishName, style: TextStyle(color: isActive ? Colors.black87 : Colors.grey)),
-                        subtitle: Text(category),
-                        trailing: Row(
+                        leading: _currentFilter == DishFilter.all
+                            ? Tooltip(
+                          message: isActive ? 'Deactivate' : 'Activate',
+                          child: Switch(
+                            value: isActive,
+                            onChanged: (value) => _toggleActiveStatus(dishDoc.reference, isActive),
+                          ),
+                        )
+                            : null,
+                        title: Text(
+                          dish.dishName,
+                          style: TextStyle(
+                              color: isActive ? Colors.black : Colors.grey,
+                              decoration: isActive ? TextDecoration.none : TextDecoration.lineThrough
+                          ),
+                        ),
+                        subtitle: Text(dish.category),
+                        trailing: (_currentFilter == DishFilter.all || _currentFilter == DishFilter.components)
+                            ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishId: dishDoc.id)))),
+                            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dish: dish)))),
                             IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _showDeleteConfirmation(dishDoc)),
                           ],
-                        ),
+                        )
+                            : null,
                         onTap: () {
-                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dishId: dishDoc.id)));
+                          Navigator.of(context).push(MaterialPageRoute(builder: (context) => EditDishScreen(dish: dish)));
                         },
                       ),
                     );
@@ -132,18 +173,20 @@ class _DishManagementScreenState extends State<DishManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: (_currentFilter == DishFilter.all || _currentFilter == DishFilter.components)
+          ? FloatingActionButton(
         onPressed: () {
           final bool isCreatingComponent = _currentFilter == DishFilter.components;
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => EditDishScreen(isComponent: isCreatingComponent),
+              builder: (context) => EditDishScreen(isCreatingComponent: isCreatingComponent),
             ),
           );
         },
-        tooltip: 'Add New',
+        tooltip: _currentFilter == DishFilter.components ? 'Add New Component' : 'Add New Dish',
         child: const Icon(Icons.add),
-      ),
+      )
+          : null,
     );
   }
 }
