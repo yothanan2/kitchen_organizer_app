@@ -20,8 +20,7 @@ dependencies:
   cloud_firestore: ^4.17.5
   cloud_functions: ^4.7.1 # This is the correct package for Cloud Functions
   dropdown_search: ^5.0.6
-  # REMOVED: firebase_functions, as it is a duplicate of cloud_functions
-
+  fl_chart: ^0.68.0
   # State Management
   flutter_riverpod: ^2.5.1
 

@@ -1,9 +1,10 @@
 // lib/analytics_screen.dart
-// UPDATED: Added a TabBar to show multiple reports, including the new Task Completion report.
+// UPDATED: Replaced ListView reports with interactive BarCharts using fl_chart.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart'; // <-- NEW IMPORT
 import 'providers.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
@@ -45,7 +46,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2, // We now have two reports
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Analytics & Reports'),
@@ -85,11 +86,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             Expanded(
               child: TabBarView(
                 children: [
-                  // View for the first tab
                   _MostUsedIngredientsView(
                     dateRange: DateTimeRange(start: _startDate, end: _endDate),
                   ),
-                  // View for the second tab
                   _TaskCompletionView(
                     dateRange: DateTimeRange(start: _startDate, end: _endDate),
                   ),
@@ -116,28 +115,78 @@ class _MostUsedIngredientsView extends ConsumerWidget {
       error: (err, stack) => Center(child: Text('Error: $err')),
       data: (ingredients) {
         if (ingredients.isEmpty) {
-          return const Center(
-            child: Text(
-              'No ingredient usage found for the selected date range.',
-              textAlign: TextAlign.center,
-            ),
-          );
+          return const Center(child: Text('No ingredient usage found for this date range.'));
         }
-        return ListView.builder(
-          itemCount: ingredients.length,
-          itemBuilder: (context, index) {
-            final ingredient = ingredients[index];
-            return ListTile(
-              leading: CircleAvatar(
-                child: Text('${index + 1}'),
+
+        final topIngredients = ingredients.take(10).toList();
+
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: topIngredients.first.totalQuantity.toDouble() * 1.2, // Add 20% padding to the top
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) => Colors.blueGrey,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final ingredient = topIngredients[groupIndex];
+                    return BarTooltipItem(
+                      '${ingredient.name}\n',
+                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      children: <TextSpan>[
+                        TextSpan(
+                          text: '${ingredient.totalQuantity.toStringAsFixed(1)} ${ingredient.unit}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-              title: Text(ingredient.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              trailing: Text(
-                '${ingredient.totalQuantity.toStringAsFixed(2)} ${ingredient.unit}',
-                style: const TextStyle(fontSize: 16),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (double value, TitleMeta meta) {
+                      if (value.toInt() >= topIngredients.length) return const SizedBox.shrink();
+                      final ingredient = topIngredients[value.toInt()];
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        space: 4.0,
+                        child: Text(
+                          ingredient.name.split(' ').first, // Show first word of name
+                          style: const TextStyle(fontSize: 10),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    },
+                    reservedSize: 30,
+                  ),
+                ),
+                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
-            );
-          },
+              borderData: FlBorderData(show: false),
+              barGroups: topIngredients.asMap().entries.map((entry) {
+                final index = entry.key;
+                final ingredient = entry.value;
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                        toY: ingredient.totalQuantity.toDouble(),
+                        color: Colors.deepPurple.shade300,
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4)
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         );
       },
     );
@@ -157,29 +206,74 @@ class _TaskCompletionView extends ConsumerWidget {
       error: (err, stack) => Center(child: Text('Error: $err')),
       data: (champions) {
         if (champions.isEmpty) {
-          return const Center(
-            child: Text(
-              'No completed tasks found for the selected date range.',
-              textAlign: TextAlign.center,
-            ),
-          );
+          return const Center(child: Text('No completed tasks found for this date range.'));
         }
-        return ListView.builder(
-          itemCount: champions.length,
-          itemBuilder: (context, index) {
-            final champion = champions[index];
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: index == 0 ? Colors.amber.shade700 : null,
-                child: Text('${index + 1}'),
+
+        final topChampions = champions.take(10).toList();
+
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: topChampions.first.taskCount.toDouble() * 1.2,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (group) => Colors.blueGrey,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final champion = topChampions[groupIndex];
+                    return BarTooltipItem(
+                      '${champion.name}\n',
+                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      children: <TextSpan>[
+                        TextSpan(
+                          text: '${champion.taskCount} tasks',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-              title: Text(champion.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              trailing: Text(
-                '${champion.taskCount} tasks completed',
-                style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (double value, TitleMeta meta) {
+                      if (value.toInt() >= topChampions.length) return const SizedBox.shrink();
+                      final champion = topChampions[value.toInt()];
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        space: 4.0,
+                        child: Text(champion.name, style: const TextStyle(fontSize: 10)),
+                      );
+                    },
+                    reservedSize: 30,
+                  ),
+                ),
+                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
-            );
-          },
+              borderData: FlBorderData(show: false),
+              barGroups: topChampions.asMap().entries.map((entry) {
+                final index = entry.key;
+                final champion = entry.value;
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                        toY: champion.taskCount.toDouble(),
+                        color: Colors.teal.shade300,
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4)
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         );
       },
     );

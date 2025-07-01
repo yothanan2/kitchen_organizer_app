@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// FINAL VERSION: Restored the "Analytics & Reports" button.
+// UPDATED: Removed the "Low-Stock Items" metric card.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,7 +14,7 @@ import 'shopping_list_screen.dart';
 import 'floor_checklist_items_screen.dart';
 import 'providers.dart';
 import 'butcher_requisition_screen.dart';
-import 'analytics_screen.dart'; // <-- Restored import
+import 'analytics_screen.dart';
 import 'widgets/weather_card_widget.dart';
 
 class AdminHomeScreen extends ConsumerWidget {
@@ -24,8 +24,8 @@ class AdminHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Only watch the provider that is needed for this screen.
     final unapprovedUsersCount = ref.watch(unapprovedUsersCountProvider);
-    final lowStockItemsCount = ref.watch(lowStockItemsCountProvider);
 
     return PopScope(
       canPop: false,
@@ -68,14 +68,6 @@ class AdminHomeScreen extends ConsumerWidget {
               asyncValue: unapprovedUsersCount,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen())),
             ),
-            const SizedBox(height: 8),
-            _buildMetricCard(
-              context: context,
-              title: 'Low-Stock Items',
-              icon: Icons.warning_amber_rounded,
-              asyncValue: lowStockItemsCount,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen())),
-            ),
             const SizedBox(height: 16),
             const _DailyNoteCard(),
             const SizedBox(height: 12),
@@ -95,7 +87,6 @@ class AdminHomeScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Generate Shopping List', icon: Icons.shopping_cart_checkout_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ShoppingListScreen()))),
             const SizedBox(height: 12),
-            // RESTORED: Button to open the analytics screen
             _buildMenuButton(context, title: 'Analytics & Reports', icon: Icons.bar_chart_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AnalyticsScreen()))),
           ],
         ),

@@ -1,5 +1,5 @@
 // lib/staff_home_screen.dart
-// UPDATED: Added the reusable DailyNoteCard widget.
+// CORRECTED: The dashboard now correctly fetches and displays stock requisitions for both today and tomorrow.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,10 +7,38 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
+import 'inventory_overview_screen.dart';
 import 'preparation_screen.dart';
 import 'providers.dart';
 import 'widgets/weather_card_widget.dart';
-import 'widgets/daily_note_card_widget.dart'; // <-- NEW IMPORT
+import 'widgets/daily_note_card_widget.dart';
+
+// --- NEW PROVIDER ---
+// This new provider specifically fetches stock requisitions from both today and tomorrow
+// to ensure the kitchen staff sees all open requests from the Butcher.
+final allOpenRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) async* {
+  final firestore = ref.watch(firestoreProvider);
+  final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+
+  final todayReqsStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+  final tomorrowReqsStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+
+  // We use a manual merge of the two streams.
+  await for (var todaySnapshot in todayReqsStream) {
+    final tomorrowSnapshot = await tomorrowReqsStream.first; // Get the latest from tomorrow's stream
+    final combinedDocs = [...todaySnapshot.docs, ...tomorrowSnapshot.docs];
+    // A simple sort to keep them somewhat ordered, can be improved if needed.
+    combinedDocs.sort((a, b) {
+      final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+      final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+      if (aTime == null || bTime == null) return 0;
+      return aTime.compareTo(bTime);
+    });
+    yield combinedDocs;
+  }
+});
+
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
   final String? userRole;
@@ -88,12 +116,15 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     final DateTime selectedDate = ref.watch(selectedDateProvider);
     final String selectedDateString = DateFormat('yyyy-MM-dd').format(selectedDate);
 
+    final lowStockItemsCount = ref.watch(lowStockItemsCountProvider);
     final isTodaysListGenerated = ref.watch(todaysListExistsProvider(selectedDateString));
     final showCompleted = ref.watch(showCompletedTasksProvider);
     final prepTasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: false, date: selectedDateString)));
-    final stockReqsAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'stockRequisitions', isCompleted: false, date: selectedDateString)));
     final completedPrepTasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: true, date: selectedDateString)));
+
+    final stockReqsAsync = ref.watch(allOpenRequisitionsProvider);
     final completedStockReqsAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'stockRequisitions', isCompleted: true, date: selectedDateString)));
+
     final newBarRequestsAsync = ref.watch(newBarRequestsProvider);
     final unitsMapAsync = ref.watch(unitsMapProvider);
 
@@ -120,14 +151,74 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
           children: <Widget>[
             const WeatherCard(),
             const SizedBox(height: 16),
-            // NEW: Added the daily note card for kitchen staff
             const DailyNoteCard(noteFieldName: 'forKitchenStaff'),
+            _buildMetricCard(
+              context: context,
+              title: 'Low-Stock Items',
+              icon: Icons.warning_amber_rounded,
+              asyncValue: lowStockItemsCount,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen())),
+            ),
+            const SizedBox(height: 16),
             _buildDateSelector(context, selectedDate),
             _buildNewBarRequests(newBarRequestsAsync),
             Text(DateFormat('EEEE, MMM d').format(selectedDate), style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
             _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, stockReqsAsync, showCompleted, completedPrepTasksAsync, completedStockReqsAsync, unitsMapAsync, selectedDate),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricCard({
+    required BuildContext context,
+    required String title,
+    required IconData icon,
+    required AsyncValue<int> asyncValue,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 4,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 40, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              asyncValue.when(
+                loading: () => const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                error: (err, stack) => Icon(Icons.error_outline, color: Colors.red.shade700),
+                data: (count) {
+                  if (count == 0) {
+                    return const Icon(Icons.check_circle_outline, color: Colors.green, size: 30);
+                  }
+                  return CircleAvatar(
+                    radius: 15,
+                    backgroundColor: Colors.orange.shade800,
+                    child: Text(
+                      count.toString(),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward_ios, color: Colors.grey),
+            ],
+          ),
         ),
       ),
     );
@@ -196,7 +287,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       AsyncValue<bool> isTodaysListGenerated,
       BuildContext context,
       AsyncValue<QuerySnapshot> prepTasksAsync,
-      AsyncValue<QuerySnapshot> stockReqsAsync,
+      AsyncValue<List<QueryDocumentSnapshot>> stockReqsAsync,
       bool showCompleted,
       AsyncValue<QuerySnapshot> completedPrepTasksAsync,
       AsyncValue<QuerySnapshot> completedStockReqsAsync,
@@ -226,11 +317,16 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
             ),
           );
         }
+
+        final prepTasksAsListOfDocs = prepTasksAsync.whenData((qs) => qs.docs);
+        final completedPrepTasksAsListOfDocs = completedPrepTasksAsync.whenData((qs) => qs.docs);
+        final completedStockReqsAsListOfDocs = completedStockReqsAsync.whenData((qs) => qs.docs);
+
         return Column(
           children: [
-            _buildTasksSection(context, title: 'Today\'s Prep Tasks', tasksAsync: prepTasksAsync, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No prep tasks for this date.', unitsMapAsync: unitsMapAsync),
+            _buildTasksSection(context, title: 'Today\'s Prep Tasks', tasksAsync: prepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No prep tasks for this date.', unitsMapAsync: unitsMapAsync),
             const SizedBox(height: 20),
-            _buildTasksSection(context, title: 'What to Bring to the Kitchen', tasksAsync: stockReqsAsync, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No stock requisitions for this date.', isButcherRequisition: true, unitsMapAsync: unitsMapAsync),
+            _buildTasksSection(context, title: 'What to Bring to the Kitchen', tasksAsync: stockReqsAsync, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No stock requisitions.', isButcherRequisition: true, unitsMapAsync: unitsMapAsync),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -241,9 +337,9 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
             ),
             if (showCompleted) ...[
               const SizedBox(height: 20),
-              _buildTasksSection(context, title: 'Completed Prep Tasks', tasksAsync: completedPrepTasksAsync, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed prep tasks for this date.', unitsMapAsync: unitsMapAsync),
+              _buildTasksSection(context, title: 'Completed Prep Tasks', tasksAsync: completedPrepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed prep tasks for this date.', unitsMapAsync: unitsMapAsync),
               const SizedBox(height: 20),
-              _buildTasksSection(context, title: 'Completed Stock Requisitions', tasksAsync: completedStockReqsAsync, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed stock requisitions for this date.', isButcherRequisition: true, unitsMapAsync: unitsMapAsync),
+              _buildTasksSection(context, title: 'Completed Stock Requisitions', tasksAsync: completedStockReqsAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed stock requisitions for this date.', isButcherRequisition: true, unitsMapAsync: unitsMapAsync),
             ],
           ],
         );
@@ -251,7 +347,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     );
   }
 
-  Widget _buildTasksSection(BuildContext context, {required String title, required AsyncValue<QuerySnapshot> tasksAsync, required Future<void> Function(DocumentSnapshot) onToggle, required String isEmptyMessage, bool isButcherRequisition = false, required AsyncValue<Map<String, String>> unitsMapAsync}) {
+  Widget _buildTasksSection(BuildContext context, {required String title, required AsyncValue<List<DocumentSnapshot>> tasksAsync, required Future<void> Function(DocumentSnapshot) onToggle, required String isEmptyMessage, bool isButcherRequisition = false, required AsyncValue<Map<String, String>> unitsMapAsync}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -260,14 +356,14 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
         tasksAsync.when(
           loading: () => const CircularProgressIndicator(),
           error: (err, stack) => Text('Error: ${err.toString()}'),
-          data: (snapshot) {
-            if (snapshot.docs.isEmpty) return Text(isEmptyMessage, style: const TextStyle(fontStyle: FontStyle.italic));
+          data: (docs) {
+            if (docs.isEmpty) return Text(isEmptyMessage, style: const TextStyle(fontStyle: FontStyle.italic));
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: snapshot.docs.length,
+              itemCount: docs.length,
               itemBuilder: (context, index) {
-                final taskDoc = snapshot.docs[index];
+                final taskDoc = docs[index];
                 final taskData = taskDoc.data() as Map<String, dynamic>;
                 final String taskName = taskData['taskName'] ?? 'Unnamed Task';
                 final bool isCompleted = taskData['isCompleted'] ?? false;
