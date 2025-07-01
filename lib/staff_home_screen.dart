@@ -1,5 +1,5 @@
 // lib/staff_home_screen.dart
-// CORRECTED: The dashboard now correctly fetches and displays stock requisitions for both today and tomorrow.
+// FINAL CORRECTED VERSION: Moves Low-Stock Items to this dashboard and navigates to the correct staff-only screen.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,13 +7,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-import 'inventory_overview_screen.dart';
 import 'preparation_screen.dart';
 import 'providers.dart';
 import 'widgets/weather_card_widget.dart';
 import 'widgets/daily_note_card_widget.dart';
+import 'staff_low_stock_screen.dart'; // <-- NEW IMPORT
 
-// --- NEW PROVIDER ---
 // This new provider specifically fetches stock requisitions from both today and tomorrow
 // to ensure the kitchen staff sees all open requests from the Butcher.
 final allOpenRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) async* {
@@ -24,11 +23,9 @@ final allOpenRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumen
   final todayReqsStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
   final tomorrowReqsStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
 
-  // We use a manual merge of the two streams.
   await for (var todaySnapshot in todayReqsStream) {
-    final tomorrowSnapshot = await tomorrowReqsStream.first; // Get the latest from tomorrow's stream
+    final tomorrowSnapshot = await tomorrowReqsStream.first;
     final combinedDocs = [...todaySnapshot.docs, ...tomorrowSnapshot.docs];
-    // A simple sort to keep them somewhat ordered, can be improved if needed.
     combinedDocs.sort((a, b) {
       final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
       final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
@@ -157,7 +154,8 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
               title: 'Low-Stock Items',
               icon: Icons.warning_amber_rounded,
               asyncValue: lowStockItemsCount,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen())),
+              // UPDATED NAVIGATION
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const StaffLowStockScreen())),
             ),
             const SizedBox(height: 16),
             _buildDateSelector(context, selectedDate),
@@ -368,7 +366,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                 final String taskName = taskData['taskName'] ?? 'Unnamed Task';
                 final bool isCompleted = taskData['isCompleted'] ?? false;
                 final String? completedBy = taskData['completedBy'];
-                final Timestamp? completedAt = taskData['completedAt'];
+                final Timestamp? completedAt = taskData['createdAt'];
                 String completionInfo = '';
                 if (isCompleted && completedBy != null && completedAt != null) {
                   final formattedTime = DateFormat('hh:mm a, MMM d').format(completedAt.toDate());

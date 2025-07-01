@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V16: Fully implemented all controllers and providers. This is the complete and correct version.
+// V16: Added lowStockItemsProvider to fetch a list of all low-stock items.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -83,16 +83,21 @@ final lowStockItemsCountProvider = StreamProvider<int>((ref) {
   });
 });
 
+// --- NEW PROVIDER ---
+// This provider fetches the full list of items that are low on stock.
 final lowStockItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('inventoryItems')
       .snapshots()
       .map((snapshot) {
+    // We filter the items here in the app's code, as Firestore cannot
+    // directly compare two fields in a query.
     return snapshot.docs
         .map((doc) => InventoryItem.fromFirestore(doc.data(), doc.id))
-        .where((item) => item.quantityOnHand <= item.minStockLevel)
-        .toList();
+        .where((item) {
+      return item.quantityOnHand <= item.minStockLevel;
+    }).toList();
   });
 });
 
@@ -118,7 +123,6 @@ class DailyNoteState {
     );
   }
 }
-
 class DailyNoteController extends StateNotifier<DailyNoteState> {
   DailyNoteController(this.ref) : super(const DailyNoteState()) {
     _loadNoteForAudience(state.selectedAudience);
@@ -334,7 +338,7 @@ final itemFormControllerProvider = StateNotifierProvider.autoDispose<ItemFormCon
 
 // ==== Butcher Requisition Provider ====
 final butcherRequestableItemsProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) {
-  final firestore = ref.read(firestoreProvider);
+  final firestore = ref.watch(firestoreProvider);
   return firestore.collection('inventoryItems').where('isButcherItem', isEqualTo: true).orderBy('itemName').snapshots();
 });
 

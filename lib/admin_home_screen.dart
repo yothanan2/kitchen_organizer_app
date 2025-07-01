@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// UPDATED: Removed the "Low-Stock Items" metric card.
+// UPDATED: Corrected import path for unified_dishes_screen.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'dish_management_screen.dart';
+import 'screens/admin/unified_dishes_screen.dart'; // <-- CORRECTED IMPORT PATH
 import 'user_management_screen.dart';
 import 'inventory_overview_screen.dart';
 import 'shopping_list_screen.dart';
@@ -73,7 +73,7 @@ class AdminHomeScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Dish Management', icon: Icons.restaurant_menu_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const DishManagementScreen()))),
+            _buildMenuButton(context, title: 'Dish & Recipe Management', icon: Icons.restaurant_menu_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UnifiedDishesScreen()))),
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Inventory Management', icon: Icons.inventory_2_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen()))),
             const SizedBox(height: 12),
