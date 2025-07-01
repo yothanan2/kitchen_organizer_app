@@ -112,7 +112,9 @@ class DailyNoteController extends StateNotifier<DailyNoteState> {
       _noteCache[NoteAudience.butcher] = notesMap['forButcherStaff'] ?? '';
       _noteCache[NoteAudience.both] = notesMap['forKitchenStaff'] ?? '';
     }
-    state = state.copyWith(noteText: _noteCache[audience] ?? '');
+    if (mounted) {
+      state = state.copyWith(noteText: _noteCache[audience] ?? '');
+    }
   }
 
   void setAudience(NoteAudience audience) {
@@ -349,7 +351,7 @@ class PreparationController extends StateNotifier<PreparationState> {
   void toggleTask(String taskId, bool isSelected) { state = state.copyWith(selectedTasks: {...state.selectedTasks, taskId: isSelected}); }
   void updateNote(String taskId, String note) { state = state.copyWith(taskNotes: {...state.taskNotes, taskId: note}); }
   Future<String?> generateLists(DateTime forDate) async {
-    // ... implementation ...
+    // ... implementation from previous step
     return null;
   }
 }
@@ -374,11 +376,11 @@ class EditDishState {
   }
 }
 class EditDishController extends StateNotifier<EditDishState> {
-  EditDishController(this.ref, Dish? initialDish) : super(const EditDishState()) {
+  EditDishController(this.ref, Dish? initialDish, bool isCreatingComponent) : super(const EditDishState()) {
     if (initialDish != null) {
       _loadDish(initialDish);
     } else {
-      state = EditDishState(dish: AsyncValue.data(Dish(id: '', dishName: '', category: '', recipeInstructions: '', isActive: true, isComponent: false)));
+      state = EditDishState(dish: AsyncValue.data(Dish(id: '', dishName: '', category: '', recipeInstructions: '', isActive: true, isComponent: isCreatingComponent)));
     }
   }
 
@@ -412,19 +414,21 @@ class EditDishController extends StateNotifier<EditDishState> {
     final currentDish = state.dish.value;
     if (currentDish == null) return;
 
-    final updatedDish = Dish(
-      id: currentDish.id,
-      dishName: dishName ?? currentDish.dishName,
-      category: category ?? currentDish.category,
-      recipeInstructions: instructions ?? currentDish.recipeInstructions,
-      isActive: isActive ?? currentDish.isActive,
-      isComponent: isComponent ?? currentDish.isComponent,
-      lastUpdated: currentDish.lastUpdated,
-      ingredients: currentDish.ingredients,
-      prepTasks: currentDish.prepTasks,
+    state = state.copyWith(
+      dish: AsyncValue.data(
+          Dish(
+            id: currentDish.id,
+            dishName: dishName ?? currentDish.dishName,
+            category: category ?? currentDish.category,
+            recipeInstructions: instructions ?? currentDish.recipeInstructions,
+            isActive: isActive ?? currentDish.isActive,
+            isComponent: isComponent ?? currentDish.isComponent,
+            lastUpdated: currentDish.lastUpdated,
+            ingredients: currentDish.ingredients,
+            prepTasks: currentDish.prepTasks,
+          )
+      ),
     );
-
-    state = state.copyWith(dish: AsyncValue.data(updatedDish));
   }
 
   void addIngredient(Map<String, dynamic> ingredientData) {
@@ -433,7 +437,7 @@ class EditDishController extends StateNotifier<EditDishState> {
     if (currentDish == null) return;
 
     final newIngredient = Ingredient(
-      id: '', // Temporary ID
+      id: '', // Temporary
       inventoryItemRef: firestore.collection('inventoryItems').doc(ingredientData['inventoryItemId']),
       unitId: ingredientData['unitId'] != null ? firestore.collection('units').doc(ingredientData['unitId']) : null,
       quantity: ingredientData['quantity'],
@@ -510,8 +514,8 @@ class EditDishController extends StateNotifier<EditDishState> {
     }
   }
 }
-final editDishControllerProvider = StateNotifierProvider.autoDispose.family<EditDishController, EditDishState, Dish?>((ref, dish) {
-  return EditDishController(ref, dish);
+final editDishControllerProvider = StateNotifierProvider.autoDispose.family<EditDishController, EditDishState, ({Dish? dish, bool isCreatingComponent})>((ref, params) {
+  return EditDishController(ref, params.dish, params.isCreatingComponent);
 });
 
 // ==== General App Data Providers ====
