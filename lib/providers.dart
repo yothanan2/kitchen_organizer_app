@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V17: Added rxdart and openRequisitionsCountProvider for the new admin dashboard.
+// V18: Added showCompletedTasksProvider.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -10,7 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:collection/collection.dart';
-import 'package:rxdart/rxdart.dart'; // <-- NEW IMPORT
+import 'package:rxdart/rxdart.dart';
 import 'models/models.dart';
 
 // ==== Enums moved here for global access ====
@@ -563,6 +563,7 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
   }
 });
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
+final showCompletedTasksProvider = StateProvider<bool>((ref) => false); // <-- ADDED THIS PROVIDER
 final newBarRequestsProvider = StreamProvider.autoDispose<List<DocumentSnapshot>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final currentStaffDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
