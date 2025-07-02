@@ -29,6 +29,8 @@ dependencies:
   csv: ^6.0.0
   intl: ^0.20.2
   http: ^1.2.1
+  rxdart: ^0.27.7 # <-- ADD THIS LINE
+
 
   # Icons
   cupertino_icons: ^1.0.6

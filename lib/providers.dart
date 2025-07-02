@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V16: Added lowStockItemsProvider to fetch a list of all low-stock items.
+// V17: Added rxdart and openRequisitionsCountProvider for the new admin dashboard.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:collection/collection.dart';
+import 'package:rxdart/rxdart.dart'; // <-- NEW IMPORT
 import 'models/models.dart';
 
 // ==== Enums moved here for global access ====
@@ -55,7 +56,7 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
   });
 });
 
-final unapprovedUsersCountProvider = StreamProvider<int>((ref) {
+final unapprovedUsersCountProvider = StreamProvider.autoDispose<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('users')
@@ -64,7 +65,7 @@ final unapprovedUsersCountProvider = StreamProvider<int>((ref) {
       .map((snapshot) => snapshot.docs.length);
 });
 
-final lowStockItemsCountProvider = StreamProvider<int>((ref) {
+final lowStockItemsCountProvider = StreamProvider.autoDispose<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('inventoryItems')
@@ -83,16 +84,12 @@ final lowStockItemsCountProvider = StreamProvider<int>((ref) {
   });
 });
 
-// --- NEW PROVIDER ---
-// This provider fetches the full list of items that are low on stock.
 final lowStockItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('inventoryItems')
       .snapshots()
       .map((snapshot) {
-    // We filter the items here in the app's code, as Firestore cannot
-    // directly compare two fields in a query.
     return snapshot.docs
         .map((doc) => InventoryItem.fromFirestore(doc.data(), doc.id))
         .where((item) {
@@ -100,7 +97,6 @@ final lowStockItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((r
     }).toList();
   });
 });
-
 
 // ==== Daily Note Controller ====
 @immutable
@@ -288,12 +284,6 @@ final locationsMapProvider = FutureProvider.autoDispose<Map<String, String>>((re
   final snapshot = await ref.watch(firestoreProvider).collection('locations').get();
   return {for (var doc in snapshot.docs) doc.id: (doc.data())['name'] ?? 'N/A'};
 });
-
-// ==== Dropdown Data Providers ====
-final unitsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('units').orderBy('name').snapshots());
-final categoriesStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('categories').orderBy('name').snapshots());
-final suppliersStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('suppliers').orderBy('name').snapshots());
-final locationsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('locations').orderBy('name').snapshots());
 
 // ==== Add/Edit Inventory Item Providers ====
 final inventoryItemProvider = FutureProvider.autoDispose.family<InventoryItem?, String>((ref, docId) async {
@@ -573,7 +563,6 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
   }
 });
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
-final showCompletedTasksProvider = StateProvider<bool>((ref) => false);
 final newBarRequestsProvider = StreamProvider.autoDispose<List<DocumentSnapshot>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final currentStaffDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -619,4 +608,29 @@ final mostUsedIngredientsProvider = FutureProvider.autoDispose.family<List<Analy
 final taskCompletionProvider = FutureProvider.autoDispose.family<List<TaskChampion>, DateTimeRange>((ref, dateRange) {
   final controller = ref.watch(analyticsControllerProvider);
   return controller.getTaskCompletionStats(startDate: dateRange.start, endDate: dateRange.end);
+});
+
+// ==== NEW PROVIDER FOR ACTION ITEMS CARD ====
+final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final tomorrow = DateFormat('yyyy-MM-dd')
+      .format(DateTime.now().add(const Duration(days: 1)));
+
+  final todayButcherReqs = firestore
+      .collection('dailyTodoLists')
+      .doc(today)
+      .collection('stockRequisitions')
+      .where('isCompleted', isEqualTo: false)
+      .snapshots();
+
+  final tomorrowButcherReqs = firestore
+      .collection('dailyTodoLists')
+      .doc(tomorrow)
+      .collection('stockRequisitions')
+      .where('isCompleted', isEqualTo: false)
+      .snapshots();
+
+  return Rx.combineLatest2(todayButcherReqs, tomorrowButcherReqs,
+          (QuerySnapshot today, QuerySnapshot tomorrow) => today.size + tomorrow.size);
 });
