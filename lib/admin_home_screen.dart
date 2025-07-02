@@ -1,13 +1,12 @@
 // lib/admin_home_screen.dart
-// UPDATED: Corrected import path for unified_dishes_screen.
+// REDESIGN V1: Grouped management buttons into a collapsible ExpansionTile.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
-import 'screens/admin/unified_dishes_screen.dart'; // <-- CORRECTED IMPORT PATH
+import 'screens/admin/unified_dishes_screen.dart';
 import 'user_management_screen.dart';
 import 'inventory_overview_screen.dart';
 import 'shopping_list_screen.dart';
@@ -24,7 +23,6 @@ class AdminHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Only watch the provider that is needed for this screen.
     final unapprovedUsersCount = ref.watch(unapprovedUsersCountProvider);
 
     return PopScope(
@@ -61,29 +59,73 @@ class AdminHomeScreen extends ConsumerWidget {
           children: <Widget>[
             const WeatherCard(),
             const SizedBox(height: 16),
-            _buildMetricCard(
-              context: context,
-              title: 'Pending Approvals',
-              icon: Icons.person_add_outlined,
-              asyncValue: unapprovedUsersCount,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen())),
+            unapprovedUsersCount.when(
+              data: (count) {
+                if (count > 0) {
+                  return Column(
+                    children: [
+                      _buildMetricCard(
+                        context: context,
+                        title: 'Pending Approvals',
+                        icon: Icons.person_add_outlined,
+                        asyncValue: unapprovedUsersCount,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen())),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (err, stack) => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 16),
             const _DailyNoteCard(),
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Dish & Recipe Management', icon: Icons.restaurant_menu_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UnifiedDishesScreen()))),
-            const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Inventory Management', icon: Icons.inventory_2_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen()))),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
+
+            // --- NEW: System Management ExpansionTile ---
+            Card(
+              elevation: 2,
+              margin: const EdgeInsets.symmetric(vertical: 8.0),
+              child: ExpansionTile(
+                title: Text("System Management", style: Theme.of(context).textTheme.titleLarge),
+                leading: const Icon(Icons.settings_outlined),
+                initiallyExpanded: false, // Start collapsed
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                children: [
+                  _buildManagementTile(
+                    context,
+                    title: 'Dish & Recipe Management',
+                    icon: Icons.restaurant_menu_outlined,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UnifiedDishesScreen())),
+                  ),
+                  _buildManagementTile(
+                    context,
+                    title: 'Inventory Management',
+                    icon: Icons.inventory_2_outlined,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InventoryOverviewScreen())),
+                  ),
+                  _buildManagementTile(
+                    context,
+                    title: 'Manage Users',
+                    icon: Icons.people_outline,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen())),
+                  ),
+                  _buildManagementTile(
+                    context,
+                    title: 'Manage Floor Checklist',
+                    icon: Icons.deck_outlined,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const FloorChecklistItemsScreen())),
+                  ),
+                ],
+              ),
+            ),
+            // --- END NEW WIDGET ---
+
+            const SizedBox(height: 8),
+
+            // --- Operations & Reports Buttons (Unchanged for now) ---
             _buildMenuButton(context, title: 'Butcher Requisition Form', icon: Icons.set_meal_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ButcherRequisitionScreen()))),
-            const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Manage Floor Checklist', icon: Icons.deck_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const FloorChecklistItemsScreen()))),
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Manage Users', icon: Icons.people_outline, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const UserManagementScreen()))),
             const SizedBox(height: 12),
             _buildMenuButton(context, title: 'Generate Shopping List', icon: Icons.shopping_cart_checkout_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ShoppingListScreen()))),
             const SizedBox(height: 12),
@@ -91,6 +133,16 @@ class AdminHomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // NEW: Helper for tiles inside the ExpansionPanel for a cleaner look
+  Widget _buildManagementTile(BuildContext context, {required String title, required IconData icon, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title: Text(title),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: onTap,
     );
   }
 
