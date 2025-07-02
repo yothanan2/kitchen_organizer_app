@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// REDESIGN V2: Added the new dynamic ActionItemsCard.
+// REDESIGN V3: Final cleanup of redundant buttons.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -58,13 +58,13 @@ class AdminHomeScreen extends ConsumerWidget {
           children: <Widget>[
             const WeatherCard(),
             const SizedBox(height: 16),
-
-            const _ActionItemsCard(), // <-- NEW DYNAMIC CARD
-
+            const _ActionItemsCard(),
             const _DailyNoteCard(),
             const SizedBox(height: 24),
 
             _buildMenuButton(context, title: 'Analytics & Reports', icon: Icons.bar_chart_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AnalyticsScreen()))),
+            const SizedBox(height: 12),
+            _buildMenuButton(context, title: 'Butcher Requisition Form', icon: Icons.set_meal_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ButcherRequisitionScreen()))),
             const SizedBox(height: 12),
 
             Card(
@@ -133,8 +133,6 @@ class AdminHomeScreen extends ConsumerWidget {
   }
 }
 
-
-// --- NEW WIDGET FOR THE ACTIONABLE ITEMS CARD ---
 class _ActionItemsCard extends ConsumerWidget {
   const _ActionItemsCard();
 
@@ -181,8 +179,6 @@ class _ActionItemsCard extends ConsumerWidget {
           count: count,
           color: Colors.blue.shade700,
           onTap: () {
-            // In the future, this could navigate to a dedicated requisitions screen
-            // For now, we can re-use the shopping list screen as it's relevant
             Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ShoppingListScreen()));
           },
         ));
@@ -195,8 +191,9 @@ class _ActionItemsCard extends ConsumerWidget {
 
     return Card(
       elevation: 4,
+      margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -235,7 +232,6 @@ class _ActionItemsCard extends ConsumerWidget {
     );
   }
 }
-
 
 class _DailyNoteCard extends ConsumerStatefulWidget {
   const _DailyNoteCard();
