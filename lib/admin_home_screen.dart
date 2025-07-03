@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// REDESIGN V3: Final cleanup of redundant buttons.
+// REDESIGN V4: Grouped requisition forms into a new panel.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -64,8 +64,28 @@ class AdminHomeScreen extends ConsumerWidget {
 
             _buildMenuButton(context, title: 'Analytics & Reports', icon: Icons.bar_chart_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AnalyticsScreen()))),
             const SizedBox(height: 12),
-            _buildMenuButton(context, title: 'Butcher Requisition Form', icon: Icons.set_meal_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ButcherRequisitionScreen()))),
-            const SizedBox(height: 12),
+
+            // --- NEW "Daily Forms" Panel ---
+            Card(
+              elevation: 2,
+              margin: const EdgeInsets.symmetric(vertical: 8.0),
+              child: ExpansionTile(
+                title: Text("Daily Forms", style: Theme.of(context).textTheme.titleLarge),
+                leading: const Icon(Icons.description_outlined),
+                initiallyExpanded: false,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                children: [
+                  _buildManagementTile(
+                    context,
+                    title: 'Butcher Requisition Form',
+                    icon: Icons.set_meal_outlined,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ButcherRequisitionScreen())),
+                  ),
+                  // Future forms like "Bar Requisition" can be added here.
+                ],
+              ),
+            ),
+            // --- END NEW PANEL ---
 
             Card(
               elevation: 2,
