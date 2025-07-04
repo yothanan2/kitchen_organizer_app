@@ -1,22 +1,27 @@
+// lib/staff_inventory_count_screen.dart
+// V3: Corrected widget data access to align with the InventoryItem model.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'providers.dart'; // Import our central providers file
+import 'providers.dart';
+import 'models/models.dart';
+import 'add_inventory_item_screen.dart';
 
 // A helper widget for displaying unit names efficiently.
 class UnitNameWidget extends ConsumerWidget {
-  final String? docId;
-  const UnitNameWidget({super.key, this.docId});
+  final DocumentReference? unitRef;
+  const UnitNameWidget({super.key, this.unitRef});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (docId == null || docId!.isEmpty) {
+    if (unitRef == null) {
       return const Text('', style: TextStyle(fontStyle: FontStyle.italic));
     }
     final unitsMapAsync = ref.watch(unitsMapProvider);
     return unitsMapAsync.when(
-      data: (unitsMap) => Text(unitsMap[docId] ?? 'N/A'),
+      data: (unitsMap) => Text(unitsMap[unitRef!.id] ?? 'N/A'),
       loading: () => const Text('...'),
       error: (_, __) => const Text('?'),
     );
@@ -25,18 +30,18 @@ class UnitNameWidget extends ConsumerWidget {
 
 // A helper widget for displaying supplier names efficiently.
 class SupplierNameWidget extends ConsumerWidget {
-  final String? docId;
-  const SupplierNameWidget({super.key, this.docId});
+  final DocumentReference? supplierRef;
+  const SupplierNameWidget({super.key, this.supplierRef});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (docId == null || docId!.isEmpty) {
+    if (supplierRef == null) {
       return const SizedBox.shrink();
     }
     final suppliersMapAsync = ref.watch(suppliersMapProvider);
     return suppliersMapAsync.when(
       data: (suppliersMap) => Text(
-        'Supplier: ${suppliersMap[docId] ?? 'Unknown'}',
+        'Supplier: ${suppliersMap[supplierRef!.id] ?? 'Unknown'}',
         style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
       ),
       loading: () => const SizedBox.shrink(),
@@ -55,112 +60,152 @@ class StaffInventoryCountScreen extends ConsumerStatefulWidget {
 }
 
 class _StaffInventoryCountScreenState extends ConsumerState<StaffInventoryCountScreen> {
-  // The state of this screen now directly manages the controllers.
   final Map<String, TextEditingController> _controllers = {};
-  bool _isLoading = false;
+  final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, num> _originalQuantities = {};
+  final Set<String> _dirtyItems = {};
 
   @override
   void dispose() {
-    for (final controller in _controllers.values) {
+    for (var controller in _controllers.values) {
       controller.dispose();
+    }
+    for (var focusNode in _focusNodes.values) {
+      focusNode.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _saveAllCounts() async {
-    setState(() => _isLoading = true);
+  void _updateQuantity(String docId, num originalQuantity) {
+    final controller = _controllers[docId];
+    if (controller == null) return;
 
-    final firestore = ref.read(firestoreProvider);
-    final batch = firestore.batch();
-
-    _controllers.forEach((docId, controller) {
-      final newQuantity = num.tryParse(controller.text);
-      if (newQuantity != null) {
-        batch.update(firestore.collection('inventoryItems').doc(docId), {
-          'quantityOnHand': newQuantity,
-          'lastUpdated': FieldValue.serverTimestamp(),
+    final newQuantity = num.tryParse(controller.text);
+    if (newQuantity != null && newQuantity != originalQuantity) {
+      FirebaseFirestore.instance
+          .collection('inventoryItems')
+          .doc(docId)
+          .update({'quantityOnHand': newQuantity, 'lastUpdated': FieldValue.serverTimestamp()})
+          .then((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quantity updated!'), backgroundColor: Colors.green),
+        );
+        setState(() {
+          _dirtyItems.remove(docId);
+          _originalQuantities[docId] = newQuantity;
         });
-      }
-    });
+        _focusNodes[docId]?.unfocus();
+      })
+          .catchError((error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update: $error'), backgroundColor: Colors.red),
+        );
+      });
+    }
+  }
 
-    try {
-      await batch.commit();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All counts saved successfully!')));
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save counts: $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  void _setupController(InventoryItem item) {
+    if (!_controllers.containsKey(item.id)) {
+      final controller = TextEditingController(text: item.quantityOnHand.toString());
+      final focusNode = FocusNode();
+      _controllers[item.id] = controller;
+      _focusNodes[item.id] = focusNode;
+      _originalQuantities[item.id] = item.quantityOnHand;
+
+      controller.addListener(() {
+        final currentQuantity = num.tryParse(controller.text);
+        if (currentQuantity != _originalQuantities[item.id]) {
+          if (!_dirtyItems.contains(item.id)) {
+            setState(() {
+              _dirtyItems.add(item.id);
+            });
+          }
+        } else {
+          if (_dirtyItems.contains(item.id)) {
+            setState(() {
+              _dirtyItems.remove(item.id);
+            });
+          }
+        }
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // We watch the simplified provider that only groups by location.
     final inventoryGroupsAsync = ref.watch(inventoryGroupsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Daily Inventory Count'),
-        actions: [
-          _isLoading
-              ? const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white)))
-              : IconButton(icon: const Icon(Icons.save), onPressed: _saveAllCounts, tooltip: 'Save All Counts'),
-        ],
-      ),
-      body: inventoryGroupsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
-        data: (groups) {
-          if (groups.isEmpty) {
-            return const Center(child: Text('No inventory items have been created.'));
-          }
+    return inventoryGroupsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
+      data: (groups) {
+        final sortedKeys = groups.keys.toList()..sort();
+        if (sortedKeys.isEmpty) {
+          return const Center(child: Text("No inventory items found."));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(8.0),
+          itemCount: sortedKeys.length,
+          itemBuilder: (context, index) {
+            final locationName = sortedKeys[index];
+            final items = groups[locationName]!;
+            final inventoryItems = items.map((doc) => InventoryItem.fromFirestore(doc.data()! as Map<String, dynamic>, doc.id)).toList();
 
-          // CORRECTED: This now correctly expands the simplified map structure.
-          final allItems = groups.values.expand((list) => list).toList();
-
-          // Initialize controllers for any new items that appear in the list.
-          for (final item in allItems) {
-            if (!_controllers.containsKey(item.id)) {
-              final initialValue = (item.data() as Map<String, dynamic>)['quantityOnHand']?.toString() ?? '0';
-              _controllers[item.id] = TextEditingController(text: initialValue);
-            }
-          }
-
-          final sortedLocations = groups.keys.toList()..sort();
-          return ListView.builder(
-            padding: const EdgeInsets.all(8),
-            itemCount: sortedLocations.length,
-            itemBuilder: (context, index) {
-              final locationName = sortedLocations[index];
-              final items = groups[locationName]!;
-
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                clipBehavior: Clip.antiAlias,
-                child: ExpansionTile(
-                  // REMOVED: The PageStorageKey that was causing the conflict has been removed.
-                  title: Text(locationName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  initiallyExpanded: true,
-                  // MODIFIED: We no longer have the category sub-grouping and map directly to the item tiles.
-                  children: items.map((itemDoc) {
-                    final controller = _controllers[itemDoc.id];
-                    return controller != null
-                        ? _InventoryItemTile(key: ValueKey(itemDoc.id), itemDoc: itemDoc, controller: controller)
-                        : const SizedBox.shrink();
-                  }).toList(),
-                ),
-              );
-            },
-          );
-        },
-      ),
+            return ExpansionTile(
+              key: PageStorageKey(locationName),
+              initiallyExpanded: true,
+              title: Text(locationName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              children: inventoryItems.map((item) {
+                _setupController(item);
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: ListTile(
+                    title: Text(item.itemName),
+                    // CORRECTED: 'unitId' is now 'unit' which is a DocumentReference.
+                    subtitle: SupplierNameWidget(supplierRef: item.supplier),
+                    trailing: SizedBox(
+                      width: 150,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _controllers[item.id],
+                              focusNode: _focusNodes[item.id],
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              onSubmitted: (_) => _updateQuantity(item.id, _originalQuantities[item.id]!),
+                            ),
+                          ),
+                          if (_dirtyItems.contains(item.id))
+                            IconButton(
+                              icon: const Icon(Icons.check_circle, color: Colors.green),
+                              onPressed: () => _updateQuantity(item.id, _originalQuantities[item.id]!),
+                            )
+                          else
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.grey),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    // CORRECTED: 'docId' is now 'documentId' in the target screen.
+                                    builder: (context) => AddInventoryItemScreen(documentId: item.id),
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -185,7 +230,8 @@ class _InventoryItemTile extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(data['itemName'] ?? 'No Name', style: const TextStyle(fontSize: 16)),
-                SupplierNameWidget(docId: data['supplier']),
+                // CORRECTED: This now passes the DocumentReference correctly.
+                SupplierNameWidget(supplierRef: data['supplier'] as DocumentReference?),
               ],
             ),
           ),
@@ -193,14 +239,15 @@ class _InventoryItemTile extends ConsumerWidget {
           SizedBox(
             width: 120,
             child: TextFormField(
-              controller: controller, // Use the controller passed from the parent.
+              controller: controller,
               textAlign: TextAlign.center,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
               decoration: InputDecoration(
                 suffix: Padding(
                   padding: const EdgeInsets.only(left: 8.0),
-                  child: UnitNameWidget(docId: data['unit']),
+                  // CORRECTED: This now passes the DocumentReference correctly.
+                  child: UnitNameWidget(unitRef: data['unit'] as DocumentReference?),
                 ),
                 border: const OutlineInputBorder(),
                 isDense: true,
