@@ -1,5 +1,5 @@
 // lib/admin_wrapper_screen.dart
-// CORRECTED: Updated PopScope to resolve deprecation warning.
+// UPDATED: Added Butcher dashboard to the main navigation bar.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'admin_home_screen.dart';
 import 'staff_wrapper_screen.dart';
 import 'floor_staff_dashboard_screen.dart';
-import 'providers.dart';
+import 'butcher_dashboard_screen.dart'; // <-- NEW IMPORT
 
 class AdminWrapperScreen extends ConsumerStatefulWidget {
   const AdminWrapperScreen({super.key});
@@ -20,15 +20,17 @@ class AdminWrapperScreen extends ConsumerStatefulWidget {
 class _AdminWrapperScreenState extends ConsumerState<AdminWrapperScreen> {
   int _selectedIndex = 0;
 
+  // UPDATED: Added the ButcherDashboardScreen to the list of pages.
   late final List<Widget> _adminPages;
 
   @override
   void initState() {
     super.initState();
     _adminPages = [
-      const AdminHomeScreen(onToggleView: null),
-      const StaffWrapperScreen(onToggleView: null),
+      const AdminHomeScreen(),
+      const StaffWrapperScreen(),
       const FloorStaffDashboardScreen(),
+      const ButcherDashboardScreen(), // <-- NEW PAGE
     ];
   }
 
@@ -42,7 +44,6 @@ class _AdminWrapperScreenState extends ConsumerState<AdminWrapperScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      // UPDATED: This now correctly handles the async dialog without making the callback async.
       onPopInvoked: (bool didPop) {
         if (didPop) return;
         showDialog<bool>(
@@ -78,6 +79,7 @@ class _AdminWrapperScreenState extends ConsumerState<AdminWrapperScreen> {
           index: _selectedIndex,
           children: _adminPages,
         ),
+        // UPDATED: Added the new Butcher navigation item.
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
@@ -85,12 +87,16 @@ class _AdminWrapperScreenState extends ConsumerState<AdminWrapperScreen> {
               label: 'Admin',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              label: 'Staff',
+              icon: Icon(Icons.soup_kitchen_outlined),
+              label: 'Kitchen',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.room_service_outlined),
+              icon: Icon(Icons.deck_outlined),
               label: 'Floor',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.set_meal_outlined), // <-- NEW ICON
+              label: 'Butcher', // <-- NEW LABEL
             ),
           ],
           currentIndex: _selectedIndex,

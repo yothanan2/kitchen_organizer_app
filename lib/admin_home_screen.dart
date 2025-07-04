@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// REDESIGN V12: Converted System Management to a navigation button.
+// V14: Updated Daily Info card title and alignment.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers.dart';
 import 'user_management_screen.dart';
 import 'analytics_screen.dart';
-import 'screens/admin/system_management_screen.dart'; // <-- NEW IMPORT
+import 'screens/admin/system_management_screen.dart';
 import 'widgets/weather_card_widget.dart';
 
 class AdminHomeScreen extends ConsumerWidget {
@@ -70,7 +70,6 @@ class AdminHomeScreen extends ConsumerWidget {
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AnalyticsScreen())),
             ),
             const SizedBox(height: 12),
-            // --- UPDATED to a simple navigation button ---
             _buildMenuButton(
               context,
               title: 'System Management',
@@ -136,8 +135,14 @@ class _DailyInfoCardState extends ConsumerState<_DailyInfoCard> {
       color: Colors.blue.shade50,
       margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
-        title: Text("Daily Info", style: Theme.of(context).textTheme.titleLarge),
-        leading: const Icon(Icons.info_outline),
+        // --- UPDATED TITLE ---
+        title: Center(
+          child: Text(
+            "Send a Note to Departments",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20),
+          ),
+        ),
+        // --- REMOVED LEADING ICON FOR BETTER CENTERING ---
         initiallyExpanded: true,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

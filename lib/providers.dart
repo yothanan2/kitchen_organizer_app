@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V18: Added showCompletedTasksProvider.
+// V19.1: Restored missing providers and kept DailyNoteController fix.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -133,7 +133,8 @@ class DailyNoteController extends StateNotifier<DailyNoteState> {
     final doc = await firestore.collection('dailyTodoLists').doc(todayId).get();
 
     if (doc.exists) {
-      final notesMap = (doc.data() as Map<String, dynamic>)['dailyNotes'] as Map<String, dynamic>? ?? {};
+      final data = doc.data() ?? {};
+      final notesMap = data['dailyNotes'] as Map<String, dynamic>? ?? {};
       _noteCache[NoteAudience.floor] = notesMap['forFloorStaff'] ?? '';
       _noteCache[NoteAudience.kitchen] = notesMap['forKitchenStaff'] ?? '';
       _noteCache[NoteAudience.butcher] = notesMap['forButcherStaff'] ?? '';
@@ -157,23 +158,29 @@ class DailyNoteController extends StateNotifier<DailyNoteState> {
     final firestore = ref.read(firestoreProvider);
     final todayId = ref.read(todayDocIdProvider(DateTime.now()));
     final note = state.noteText;
-
-    final Map<String, dynamic> dataToUpdate = {};
-    if (state.selectedAudience == NoteAudience.floor) {
-      dataToUpdate['dailyNotes.forFloorStaff'] = note;
-    } else if (state.selectedAudience == NoteAudience.kitchen) {
-      dataToUpdate['dailyNotes.forKitchenStaff'] = note;
-    } else if (state.selectedAudience == NoteAudience.butcher) {
-      dataToUpdate['dailyNotes.forButcherStaff'] = note;
-    } else {
-      dataToUpdate['dailyNotes.forFloorStaff'] = note;
-      dataToUpdate['dailyNotes.forKitchenStaff'] = note;
-      dataToUpdate['dailyNotes.forButcherStaff'] = note;
-    }
+    final docRef = firestore.collection('dailyTodoLists').doc(todayId);
 
     try {
-      await firestore.collection('dailyTodoLists').doc(todayId).set(dataToUpdate, SetOptions(merge: true));
+      final doc = await docRef.get();
+      final Map<String, dynamic> notesMap = (doc.exists && doc.data()?['dailyNotes'] != null)
+          ? Map<String, dynamic>.from(doc.data()!['dailyNotes'])
+          : {};
+
+      if (state.selectedAudience == NoteAudience.floor) {
+        notesMap['forFloorStaff'] = note;
+      } else if (state.selectedAudience == NoteAudience.kitchen) {
+        notesMap['forKitchenStaff'] = note;
+      } else if (state.selectedAudience == NoteAudience.butcher) {
+        notesMap['forButcherStaff'] = note;
+      } else { // NoteAudience.both
+        notesMap['forFloorStaff'] = note;
+        notesMap['forKitchenStaff'] = note;
+        notesMap['forButcherStaff'] = note;
+      }
+
+      await docRef.set({'dailyNotes': notesMap}, SetOptions(merge: true));
       await _loadNoteForAudience(state.selectedAudience);
+
       state = state.copyWith(isSaving: false);
       return null;
     } catch (e) {
@@ -563,7 +570,7 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
   }
 });
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
-final showCompletedTasksProvider = StateProvider<bool>((ref) => false); // <-- ADDED THIS PROVIDER
+final showCompletedTasksProvider = StateProvider<bool>((ref) => false);
 final newBarRequestsProvider = StreamProvider.autoDispose<List<DocumentSnapshot>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final currentStaffDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -611,7 +618,7 @@ final taskCompletionProvider = FutureProvider.autoDispose.family<List<TaskChampi
   return controller.getTaskCompletionStats(startDate: dateRange.start, endDate: dateRange.end);
 });
 
-// ==== NEW PROVIDER FOR ACTION ITEMS CARD ====
+// ==== Admin Dashboard Providers ====
 final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
