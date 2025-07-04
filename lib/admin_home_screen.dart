@@ -1,5 +1,5 @@
 // lib/admin_home_screen.dart
-// V14: Updated Daily Info card title and alignment.
+// V15: Added button to navigate to note history screen.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +10,7 @@ import 'providers.dart';
 import 'user_management_screen.dart';
 import 'analytics_screen.dart';
 import 'screens/admin/system_management_screen.dart';
+import 'screens/admin/daily_notes_history_screen.dart'; // <-- NEW IMPORT
 import 'widgets/weather_card_widget.dart';
 
 class AdminHomeScreen extends ConsumerWidget {
@@ -135,14 +136,12 @@ class _DailyInfoCardState extends ConsumerState<_DailyInfoCard> {
       color: Colors.blue.shade50,
       margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
-        // --- UPDATED TITLE ---
         title: Center(
           child: Text(
             "Send a Note to Departments",
             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20),
           ),
         ),
-        // --- REMOVED LEADING ICON FOR BETTER CENTERING ---
         initiallyExpanded: true,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -170,24 +169,37 @@ class _DailyInfoCardState extends ConsumerState<_DailyInfoCard> {
             ),
           ),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: dailyNoteState.isSaving
-                ? null
-                : () async {
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              final error = await dailyNoteController.saveNote();
-              if (mounted) {
-                if (error == null) {
-                  scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Daily info saved!"), backgroundColor: Colors.green));
-                } else {
-                  scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $error"), backgroundColor: Colors.red));
-                }
-              }
-            },
-            icon: dailyNoteState.isSaving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.send_outlined),
-            label: const Text('Send Out'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // --- NEW HISTORY BUTTON ---
+              TextButton.icon(
+                icon: const Icon(Icons.history, size: 20),
+                label: const Text("View History"),
+                onPressed: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => const DailyNotesHistoryScreen()));
+                },
+              ),
+              ElevatedButton.icon(
+                onPressed: dailyNoteState.isSaving
+                    ? null
+                    : () async {
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+                  final error = await dailyNoteController.saveNote();
+                  if (mounted) {
+                    if (error == null) {
+                      scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Daily info saved!"), backgroundColor: Colors.green));
+                    } else {
+                      scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $error"), backgroundColor: Colors.red));
+                    }
+                  }
+                },
+                icon: dailyNoteState.isSaving
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.send_outlined),
+                label: const Text('Send Out'),
+              ),
+            ],
           ),
         ],
       ),

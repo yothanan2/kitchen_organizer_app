@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V19.1: Restored missing providers and kept DailyNoteController fix.
+// V21: Restored all missing dropdown stream providers.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -179,9 +179,15 @@ class DailyNoteController extends StateNotifier<DailyNoteState> {
       }
 
       await docRef.set({'dailyNotes': notesMap}, SetOptions(merge: true));
-      await _loadNoteForAudience(state.selectedAudience);
 
-      state = state.copyWith(isSaving: false);
+      _noteCache[state.selectedAudience] = '';
+      if (state.selectedAudience == NoteAudience.both) {
+        _noteCache[NoteAudience.floor] = '';
+        _noteCache[NoteAudience.kitchen] = '';
+        _noteCache[NoteAudience.butcher] = '';
+      }
+      state = state.copyWith(isSaving: false, noteText: '');
+
       return null;
     } catch (e) {
       state = state.copyWith(isSaving: false);
@@ -291,6 +297,13 @@ final locationsMapProvider = FutureProvider.autoDispose<Map<String, String>>((re
   final snapshot = await ref.watch(firestoreProvider).collection('locations').get();
   return {for (var doc in snapshot.docs) doc.id: (doc.data())['name'] ?? 'N/A'};
 });
+
+// ==== Dropdown Data Providers ====
+final unitsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('units').orderBy('name').snapshots());
+final categoriesStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('categories').orderBy('name').snapshots());
+final suppliersStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('suppliers').orderBy('name').snapshots());
+final locationsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('locations').orderBy('name').snapshots());
+
 
 // ==== Add/Edit Inventory Item Providers ====
 final inventoryItemProvider = FutureProvider.autoDispose.family<InventoryItem?, String>((ref, docId) async {
