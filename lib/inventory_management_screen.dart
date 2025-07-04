@@ -1,5 +1,5 @@
 // lib/inventory_management_screen.dart
-// UPDATED: Now navigates to the official AddInventoryItemScreen.
+// V2: Removed redundant .toDate() calls.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import 'providers.dart';
-import 'add_inventory_item_screen.dart'; // <-- CORRECTED IMPORT
+import 'add_inventory_item_screen.dart';
 import 'models/models.dart';
 
 // Provider to fetch all inventory items using the central model.
@@ -70,8 +70,9 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
             valB = b.quantityOnHand;
             break;
           case 'lastUpdated':
-            valA = a.lastUpdated?.toDate().millisecondsSinceEpoch ?? 0;
-            valB = b.lastUpdated?.toDate().millisecondsSinceEpoch ?? 0;
+          // CORRECTED: The .toDate() call is removed as lastUpdated is already a DateTime?
+            valA = a.lastUpdated?.millisecondsSinceEpoch ?? 0;
+            valB = b.lastUpdated?.millisecondsSinceEpoch ?? 0;
             break;
           default:
             valA = a.itemName.toLowerCase();
@@ -128,7 +129,6 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
   void _navigateToEditItem(String? docId) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        // CORRECTED: Navigates to the screen we decided to keep.
         builder: (context) => AddInventoryItemScreen(documentId: docId),
       ),
     );
@@ -253,7 +253,8 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
                       final unitName = unitsMap[item.unit?.id] ?? 'N/A';
                       final categoryName = categoriesMap[item.category?.id] ?? 'N/A';
                       final locationName = locationsMap[item.location?.id] ?? 'N/A';
-                      final lastUpdatedDate = item.lastUpdated?.toDate();
+                      // CORRECTED: The .toDate() call is removed as lastUpdated is already a DateTime?
+                      final lastUpdatedDate = item.lastUpdated;
                       final formattedDate = lastUpdatedDate != null ? DateFormat('MMM d, yy HH:mm').format(lastUpdatedDate) : 'N/A';
 
                       return DataRow(

@@ -1,106 +1,140 @@
 // lib/add_inventory_item_screen.dart
-// REFACTORED: Updated to use the central InventoryItem model from the provider.
+// V3: Updated DropdownSearch to use searchFieldProps.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'providers.dart';
-import 'models/models.dart'; // <-- ADDED IMPORT FOR OUR MODELS
+import 'models/models.dart';
 
 class AddInventoryItemScreen extends ConsumerStatefulWidget {
   final String? documentId;
   const AddInventoryItemScreen({super.key, this.documentId});
 
   @override
-  ConsumerState<AddInventoryItemScreen> createState() => _AddInventoryItemScreenState();
+  ConsumerState<AddInventoryItemScreen> createState() =>
+      _AddInventoryItemScreenState();
 }
 
-class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen> {
+class _AddInventoryItemScreenState
+    extends ConsumerState<AddInventoryItemScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _itemNameController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _itemCodeController = TextEditingController();
+  final _parLevelController = TextEditingController();
   final _minStockController = TextEditingController();
 
   String? _selectedCategoryId;
   String? _selectedSupplierId;
-  String? _selectedLocationId;
   String? _selectedUnitId;
+  String? _selectedLocationId;
 
-  bool _isInitialized = false;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.documentId != null) {
+      _loadItemData();
+    }
+  }
+
+  void _loadItemData() {
+    ref
+        .read(inventoryItemProvider(widget.documentId!).future)
+        .then((item) {
+      if (item != null && mounted) {
+        _nameController.text = item.itemName;
+        _itemCodeController.text = item.itemCode ?? '';
+        _parLevelController.text = item.parLevel.toString();
+        _minStockController.text = item.minStockLevel.toString();
+        setState(() {
+          _selectedCategoryId = item.category?.id;
+          _selectedSupplierId = item.supplier?.id;
+          _selectedUnitId = item.unit?.id;
+          _selectedLocationId = item.location?.id;
+        });
+        ref
+            .read(itemFormControllerProvider.notifier)
+            .updateIsButcherItem(item.isButcherItem);
+      }
+    });
+  }
 
   @override
   void dispose() {
-    _itemNameController.dispose();
+    _nameController.dispose();
+    _itemCodeController.dispose();
+    _parLevelController.dispose();
     _minStockController.dispose();
     super.dispose();
   }
 
+  Future<void> _saveItem() async {
+    if (_formKey.currentState!.validate()) {
+      final firestore = ref.read(firestoreProvider);
+      final isButcherItem = ref.read(itemFormControllerProvider).isButcherItem;
+
+      final itemData = {
+        'itemName': _nameController.text,
+        'itemCode': _itemCodeController.text,
+        'category': _selectedCategoryId != null
+            ? firestore.collection('categories').doc(_selectedCategoryId)
+            : null,
+        'supplier': _selectedSupplierId != null
+            ? firestore.collection('suppliers').doc(_selectedSupplierId)
+            : null,
+        'unit': _selectedUnitId != null
+            ? firestore.collection('units').doc(_selectedUnitId)
+            : null,
+        'location': _selectedLocationId != null
+            ? firestore.collection('locations').doc(_selectedLocationId)
+            : null,
+        'parLevel': num.tryParse(_parLevelController.text) ?? 0,
+        'minStockLevel': num.tryParse(_minStockController.text) ?? 0,
+        'isButcherItem': isButcherItem,
+      };
+
+      final error = await ref
+          .read(itemFormControllerProvider.notifier)
+          .saveItem(existingDocId: widget.documentId, itemData: itemData);
+
+      if (mounted) {
+        if (error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Item saved successfully!'),
+                backgroundColor: Colors.green),
+          );
+          Navigator.of(context).pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Error: $error'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bool isEditing = widget.documentId != null && widget.documentId!.isNotEmpty;
     final formState = ref.watch(itemFormControllerProvider);
-    final formController = ref.read(itemFormControllerProvider.notifier);
-
-    if (isEditing) {
-      // UPDATED: The listener now correctly expects an InventoryItem.
-      ref.listen<AsyncValue<InventoryItem?>>(inventoryItemProvider(widget.documentId!), (prev, next) {
-        if (!_isInitialized && next.hasValue && next.value != null) {
-          final item = next.value!; // We know item is not null here.
-
-          // UPDATED: Logic is now cleaner, using the model's properties.
-          _itemNameController.text = item.itemName;
-          _minStockController.text = item.minStockLevel.toString();
-
-          setState(() {
-            _selectedCategoryId = item.category?.id;
-            _selectedSupplierId = item.supplier?.id;
-            _selectedLocationId = item.location?.id;
-            _selectedUnitId = item.unit?.id;
-          });
-
-          // Update the controller with the specific state it manages.
-          formController.updateIsButcherItem(item.isButcherItem);
-          _isInitialized = true;
-        }
-      });
-    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Item' : 'Add New Item'),
+        title: Text(widget.documentId == null ? 'Add Item' : 'Edit Item'),
         actions: [
-          formState.isLoading
-              ? const Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(color: Colors.white))
-              : IconButton(
-            onPressed: () async {
-              if (_formKey.currentState!.validate()) {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                final navigator = Navigator.of(context);
-
-                final Map<String, dynamic> itemData = {
-                  'itemName': _itemNameController.text,
-                  'minStockLevel': num.tryParse(_minStockController.text) ?? 0,
-                  'category': _selectedCategoryId != null ? ref.read(firestoreProvider).collection('categories').doc(_selectedCategoryId) : null,
-                  'supplier': _selectedSupplierId != null ? ref.read(firestoreProvider).collection('suppliers').doc(_selectedSupplierId) : null,
-                  'location': _selectedLocationId != null ? ref.read(firestoreProvider).collection('locations').doc(_selectedLocationId) : null,
-                  'unit': _selectedUnitId != null ? ref.read(firestoreProvider).collection('units').doc(_selectedUnitId) : null,
-                };
-
-                final error = await formController.saveItem(
-                    existingDocId: widget.documentId,
-                    itemData: itemData
-                );
-
-                if (error == null) {
-                  scaffoldMessenger.showSnackBar(SnackBar(content: Text('Item ${isEditing ? 'updated' : 'added'} successfully!')));
-                  navigator.pop();
-                } else {
-                  scaffoldMessenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                }
-              }
-            },
-            icon: const Icon(Icons.save),
-          ),
+          if (formState.isLoading)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: Colors.white),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: _saveItem,
+              tooltip: 'Save Item',
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -108,39 +142,97 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
               TextFormField(
-                controller: _itemNameController,
-                decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder()),
-                validator: (value) => (value == null || value.isEmpty) ? 'Item name is required' : null,
-              ),
-              const SizedBox(height: 24),
-              _buildDropdown('categories', 'Select Category', _selectedCategoryId, (val) => setState(() => _selectedCategoryId = val), isRequired: true),
-              const SizedBox(height: 16),
-              _buildDropdown('suppliers', 'Select Supplier', _selectedSupplierId, (val) => setState(() => _selectedSupplierId = val), isRequired: true),
-              const SizedBox(height: 16),
-              _buildDropdown('locations', 'Select Location', _selectedLocationId, (val) => setState(() => _selectedLocationId = val), isRequired: true),
-              const SizedBox(height: 16),
-              _buildDropdown('units', 'Select Unit', _selectedUnitId, (val) => setState(() => _selectedUnitId = val), isRequired: true),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _minStockController,
-                decoration: const InputDecoration(labelText: 'Minimum Stock Level', border: OutlineInputBorder()),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-              ),
-              const SizedBox(height: 16),
-              const Divider(),
-              SwitchListTile(
-                title: const Text("Butcher Item"),
-                subtitle: const Text("Can this item be requested by the butcher?"),
-                value: formState.isButcherItem,
-                onChanged: (value) {
-                  formController.updateIsButcherItem(value);
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Item Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter the item name';
+                  }
+                  return null;
                 },
               ),
-              const Divider(),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _itemCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Item Code (Optional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildDropdownSearch(
+                label: 'Category',
+                provider: categoriesStreamProvider,
+                selectedId: _selectedCategoryId,
+                onChanged: (id) => setState(() => _selectedCategoryId = id),
+              ),
+              const SizedBox(height: 16),
+              _buildDropdownSearch(
+                label: 'Supplier',
+                provider: suppliersStreamProvider,
+                selectedId: _selectedSupplierId,
+                onChanged: (id) => setState(() => _selectedSupplierId = id),
+              ),
+              const SizedBox(height: 16),
+              _buildDropdownSearch(
+                label: 'Unit',
+                provider: unitsStreamProvider,
+                selectedId: _selectedUnitId,
+                onChanged: (id) => setState(() => _selectedUnitId = id),
+                isRequired: true,
+              ),
+              const SizedBox(height: 16),
+              _buildDropdownSearch(
+                label: 'Storage Location',
+                provider: locationsStreamProvider,
+                selectedId: _selectedLocationId,
+                onChanged: (id) => setState(() => _selectedLocationId = id),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _parLevelController,
+                      decoration: const InputDecoration(
+                        labelText: 'Par Level',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _minStockController,
+                      decoration: const InputDecoration(
+                        labelText: 'Min Stock',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Butcher Item'),
+                subtitle: const Text(
+                    'Enable this if the item is for butcher requisitions.'),
+                value: formState.isButcherItem,
+                onChanged: (value) {
+                  ref
+                      .read(itemFormControllerProvider.notifier)
+                      .updateIsButcherItem(value);
+                },
+                secondary: const Icon(Icons.kitchen),
+              ),
             ],
           ),
         ),
@@ -148,33 +240,55 @@ class _AddInventoryItemScreenState extends ConsumerState<AddInventoryItemScreen>
     );
   }
 
-  Widget _buildDropdown(String collection, String hint, String? value, Function(String?) onChanged, {bool isRequired = false}) {
-    // This defines a local provider just for this dropdown widget.
-    final dropdownStreamProvider = StreamProvider.autoDispose.family<QuerySnapshot, String>(
-            (ref, collection) => ref.watch(firestoreProvider).collection(collection).orderBy('name').snapshots()
-    );
+  Widget _buildDropdownSearch({
+    required String label,
+    required AutoDisposeStreamProvider<QuerySnapshot<Object?>> provider,
+    required String? selectedId,
+    required ValueChanged<String?> onChanged,
+    bool isRequired = false,
+  }) {
+    final asyncData = ref.watch(provider);
 
-    return Consumer(
-      builder: (context, ref, child) {
-        final asyncData = ref.watch(dropdownStreamProvider(collection));
-        return asyncData.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, stack) => Text('Error loading $collection'),
-          data: (snapshot) {
-            final items = snapshot.docs.map((doc) {
-              final docData = doc.data() as Map<String, dynamic>?;
-              final name = docData?['name'] ?? 'Unnamed';
-              return DropdownMenuItem<String>(value: doc.id, child: Text(name));
-            }).toList();
-            return DropdownButtonFormField<String>(
-              value: value,
-              hint: Text(hint),
-              items: items,
-              onChanged: onChanged,
-              validator: (val) => (isRequired && val == null) ? 'This field is required' : null,
-              isExpanded: true,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            );
+    return asyncData.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (err, stack) => Text('Error loading $label: $err'),
+      data: (snapshot) {
+        final items = snapshot.docs
+            .map((doc) =>
+        {'id': doc.id, 'name': (doc.data() as Map)['name'] ?? ''})
+            .toList();
+
+        final selectedItem = items.firstWhere(
+              (item) => item['id'] == selectedId,
+          orElse: () => {'id': null, 'name': null},
+        );
+
+        return DropdownSearch<Map<String, dynamic>>(
+          items: items,
+          itemAsString: (item) => item['name'] as String,
+          selectedItem: selectedItem['id'] != null ? selectedItem : null,
+          onChanged: (item) => onChanged(item?['id'] as String?),
+          dropdownDecoratorProps: DropDownDecoratorProps(
+            dropdownSearchDecoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          popupProps: const PopupProps.menu(
+            showSearchBox: true,
+            // CORRECTED: This now uses the correct property.
+            searchFieldProps: TextFieldProps(
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          validator: (value) {
+            if (isRequired && value == null) {
+              return 'Please select a $label';
+            }
+            return null;
           },
         );
       },

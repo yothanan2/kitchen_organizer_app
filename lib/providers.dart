@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V22: Added todaysButcherRequisitionsProvider.
+// V23: Replaced allOpenRequisitionsProvider with a family provider.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -656,28 +656,14 @@ final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
           (QuerySnapshot today, QuerySnapshot tomorrow) => today.size + tomorrow.size);
 });
 
-// ADDED a new provider for the staff screen
-final allOpenRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
+// CORRECTED: This provider now takes a date string to fetch requisitions for a specific day.
+final stockRequisitionsProvider = StreamProvider.autoDispose.family<List<QueryDocumentSnapshot>, String>((ref, dateString) {
   final firestore = ref.watch(firestoreProvider);
-  final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
-  final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
-
-  final todayReqsStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
-  final tomorrowReqsStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
-
-  return Rx.combineLatest2(
-    todayReqsStream,
-    tomorrowReqsStream,
-        (QuerySnapshot todaySnapshot, QuerySnapshot tomorrowSnapshot) {
-      final combinedDocs = [...todaySnapshot.docs, ...tomorrowSnapshot.docs];
-      final uniqueDocs = { for (var d in combinedDocs) d.id : d }.values.toList();
-      uniqueDocs.sort((a, b) {
-        final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-        final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-        if (aTime == null || bTime == null) return 0;
-        return aTime.compareTo(bTime);
-      });
-      return uniqueDocs;
-    },
-  );
+  return firestore
+      .collection('dailyTodoLists')
+      .doc(dateString)
+      .collection('stockRequisitions')
+      .where('isCompleted', isEqualTo: false)
+      .snapshots()
+      .map((snapshot) => snapshot.docs);
 });
