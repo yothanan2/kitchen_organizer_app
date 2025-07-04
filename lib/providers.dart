@@ -655,3 +655,29 @@ final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
   return Rx.combineLatest2(todayButcherReqs, tomorrowButcherReqs,
           (QuerySnapshot today, QuerySnapshot tomorrow) => today.size + tomorrow.size);
 });
+
+// ADDED a new provider for the staff screen
+final allOpenRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+
+  final todayReqsStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+  final tomorrowReqsStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+
+  return Rx.combineLatest2(
+    todayReqsStream,
+    tomorrowReqsStream,
+        (QuerySnapshot todaySnapshot, QuerySnapshot tomorrowSnapshot) {
+      final combinedDocs = [...todaySnapshot.docs, ...tomorrowSnapshot.docs];
+      final uniqueDocs = { for (var d in combinedDocs) d.id : d }.values.toList();
+      uniqueDocs.sort((a, b) {
+        final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+        final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+        if (aTime == null || bTime == null) return 0;
+        return aTime.compareTo(bTime);
+      });
+      return uniqueDocs;
+    },
+  );
+});
