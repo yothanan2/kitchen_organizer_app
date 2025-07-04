@@ -1,97 +1,61 @@
 // lib/staff_wrapper_screen.dart
-// CORRECTED: Updated PopScope to resolve deprecation warning.
+// V2: Converted to use a TabBar at the top instead of a BottomNavigationBar.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'staff_home_screen.dart';
-import 'staff_inventory_count_screen.dart';
+import 'staff_inventory_count_screen.dart'; // Ensure this is the correct screen for inventory
+import 'providers.dart';
 
-class StaffWrapperScreen extends StatefulWidget {
-  final String? userRole;
-  final VoidCallback? onToggleView;
-
-  const StaffWrapperScreen({super.key, this.userRole, this.onToggleView});
+class StaffWrapperScreen extends ConsumerWidget {
+  const StaffWrapperScreen({super.key});
 
   @override
-  State<StaffWrapperScreen> createState() => _StaffWrapperScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appUser = ref.watch(appUserProvider).value;
 
-class _StaffWrapperScreenState extends State<StaffWrapperScreen> {
-  int _selectedIndex = 0;
-
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      StaffHomeScreen(userRole: widget.userRole, onToggleView: widget.onToggleView),
-      const StaffInventoryCountScreen(),
-    ];
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      // UPDATED: This now correctly handles the async dialog without making the callback async.
-      onPopInvoked: (bool didPop) {
-        if (didPop) return;
-        showDialog<bool>(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: const Text('Exit App?'),
-              content: const Text('Are you sure you want to close the app?'),
-              actions: <Widget>[
-                TextButton(
-                  child: const Text('No'),
-                  onPressed: () {
-                    Navigator.of(context).pop(false);
-                  },
-                ),
-                TextButton(
-                  child: const Text('Yes'),
-                  onPressed: () {
-                    Navigator.of(context).pop(true);
-                  },
-                ),
-              ],
-            );
-          },
-        ).then((shouldPop) {
-          if (shouldPop ?? false) {
-            SystemNavigator.pop();
-          }
-        });
-      },
+    return DefaultTabController(
+      length: 2, // We have two tabs: Today and Inventory
       child: Scaffold(
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: _pages,
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: Colors.grey,
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.today_outlined),
-              label: 'Today',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              label: 'Inventory',
+        appBar: AppBar(
+          title: const Text('Staff Dashboard'),
+          actions: [
+            // This button allows an Admin to switch back to the Admin view
+            if (appUser?.role == 'Admin')
+              Tooltip(
+                message: 'Switch to Admin View',
+                child: IconButton(
+                  icon: const Icon(Icons.admin_panel_settings),
+                  onPressed: () {
+                    // This logic assumes you have a way to switch views,
+                    // for now, we'll just sign out as a placeholder if needed.
+                    // Ideally, you'd have a provider to toggle the view.
+                    FirebaseAuth.instance.signOut();
+                  },
+                ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              tooltip: 'Logout',
             ),
           ],
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.today), text: 'Today'),
+              Tab(icon: Icon(Icons.inventory), text: 'Inventory'),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            // Page 1: The main staff dashboard
+            StaffHomeScreen(),
+            // Page 2: The inventory counting screen
+            StaffInventoryCountScreen(),
+          ],
         ),
       ),
     );

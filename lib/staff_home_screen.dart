@@ -1,9 +1,8 @@
 // lib/staff_home_screen.dart
-// FINAL CORRECTED VERSION: Moves Low-Stock Items to this dashboard and navigates to the correct staff-only screen.
+// V3: Removed the Scaffold and AppBar since this is now a child view of a TabBar.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
@@ -14,10 +13,7 @@ import 'widgets/daily_note_card_widget.dart';
 import 'staff_low_stock_screen.dart';
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
-  final String? userRole;
-  final VoidCallback? onToggleView;
-
-  const StaffHomeScreen({super.key, this.userRole, this.onToggleView});
+  const StaffHomeScreen({super.key});
 
   @override
   ConsumerState<StaffHomeScreen> createState() => _StaffHomeScreenState();
@@ -37,7 +33,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
 
     _colorAnimation = ColorTween(
       begin: Colors.red.shade700,
-      end: Colors.green.shade700,
+      end: Colors.orange.shade700,
     ).animate(_animationController);
   }
 
@@ -101,46 +97,30 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     final newBarRequestsAsync = ref.watch(newBarRequestsProvider);
     final unitsMapAsync = ref.watch(unitsMapProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Staff Dashboard'),
-        actions: [
-          if (widget.userRole == 'Admin' && widget.onToggleView != null)
-            Tooltip(
-              message: 'Switch to Admin View',
-              child: IconButton(icon: const Icon(Icons.switch_account), onPressed: widget.onToggleView),
-            ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuth.instance.signOut(),
-            tooltip: 'Logout',
+    // REMOVED Scaffold and AppBar. Now returns the direct layout.
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _buildNewBarRequests(newBarRequestsAsync),
+          const WeatherCard(),
+          const SizedBox(height: 16),
+          const DailyNoteCard(noteFieldName: 'forKitchenStaff'),
+          const SizedBox(height: 16),
+          _buildMetricCard(
+            context: context,
+            title: 'Low-Stock Items',
+            icon: Icons.warning_amber_rounded,
+            asyncValue: lowStockItemsCount,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const StaffLowStockScreen())),
           ),
+          const SizedBox(height: 16),
+          _buildDateSelector(context, selectedDate),
+          Text(DateFormat('EEEE, MMM d').format(selectedDate), style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, stockReqsAsync, showCompleted, completedPrepTasksAsync, completedStockReqsAsync, unitsMapAsync, selectedDate),
         ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const WeatherCard(),
-            const SizedBox(height: 16),
-            const DailyNoteCard(noteFieldName: 'forKitchenStaff'),
-            _buildMetricCard(
-              context: context,
-              title: 'Low-Stock Items',
-              icon: Icons.warning_amber_rounded,
-              asyncValue: lowStockItemsCount,
-              // UPDATED NAVIGATION
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const StaffLowStockScreen())),
-            ),
-            const SizedBox(height: 16),
-            _buildDateSelector(context, selectedDate),
-            _buildNewBarRequests(newBarRequestsAsync),
-            Text(DateFormat('EEEE, MMM d').format(selectedDate), style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 16),
-            _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, stockReqsAsync, showCompleted, completedPrepTasksAsync, completedStockReqsAsync, unitsMapAsync, selectedDate),
-          ],
-        ),
       ),
     );
   }
@@ -268,7 +248,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       AsyncValue<Map<String, String>> unitsMapAsync,
       DateTime selectedDate) {
     return isTodaysListGenerated.when(
-      loading: () => const CircularProgressIndicator(),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Text('Error: ${err.toString()}'),
       data: (exists) {
         if (!exists) {
