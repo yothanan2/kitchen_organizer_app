@@ -1,5 +1,5 @@
 // lib/butcher_requisition_screen.dart
-// FINAL: This version introduces a local Unit model to resolve type errors.
+// FINAL CORRECTED VERSION: Implements the new grouped requisition data model.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -76,6 +76,7 @@ class _ButcherRequisitionScreenState
     }
   }
 
+  // --- THIS IS THE NEW, CORRECTED SUBMISSION LOGIC ---
   Future<void> _submitRequisition() async {
     setState(() => _isLoading = true);
 
@@ -90,11 +91,13 @@ class _ButcherRequisitionScreenState
         final originalItemDoc =
         allRequestableItemsSnapshot.firstWhereOrNull((doc) => doc.id == docId);
         if (originalItemDoc != null) {
+          final itemData = originalItemDoc.data() as Map<String, dynamic>;
           itemsToSubmit.add({
+            // Store references and values needed for the new model
             'itemRef': originalItemDoc.reference,
-            'itemName':
-            (originalItemDoc.data() as Map<String, dynamic>)['name'],
-            'quantity': formData.quantityController.text,
+            'itemName': itemData['name'],
+            'source': itemData['source'],
+            'quantity': num.tryParse(formData.quantityController.text) ?? 0,
             'unitRef': formData.selectedUnitRef!,
           });
         }
@@ -111,34 +114,26 @@ class _ButcherRequisitionScreenState
 
     final firestore = ref.read(firestoreProvider);
     final appUser = ref.read(appUserProvider).value;
-    final requisitionDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-    final batch = firestore.batch();
-    final listDocRef = firestore.collection('dailyTodoLists').doc(requisitionDate);
 
-    final unitsMap = await ref.read(unitsMapProvider.future);
-
-    for (final submissionItem in itemsToSubmit) {
-      final unitName = unitsMap[submissionItem['unitRef'].id] ?? '';
-      final taskRef = listDocRef.collection('stockRequisitions').doc();
-      batch.set(taskRef, {
-        'taskName':
-        'From Butcher: ${submissionItem['quantity']} $unitName of ${submissionItem['itemName']}',
-        'category': 'Butcher Requisition',
-        'requestedBy': appUser?.fullName ?? 'Butcher',
-        'createdAt': FieldValue.serverTimestamp(),
-        'inventoryItemRef': submissionItem['itemRef'],
-        'quantity': num.tryParse(submissionItem['quantity']) ?? 0,
-        'unitRef': submissionItem['unitRef'],
-        'isCompleted': false,
-      });
-    }
+    // Create a single requisition document in the new top-level collection.
+    final requisitionDoc = firestore.collection('requisitions').doc();
 
     try {
-      await batch.commit();
+      await requisitionDoc.set({
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': appUser?.fullName ?? 'Butcher',
+        'userId': appUser?.uid,
+        'requisitionForDate': Timestamp.fromDate(_selectedDate),
+        'status': 'requested', // This is the first state for the blinking bell!
+        'items': itemsToSubmit, // The list of items is saved inside the document.
+        'department': 'butcher',
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Requisition submitted successfully!"),
             backgroundColor: Colors.green));
+        // Reset the form after successful submission.
         _formState.forEach((key, value) {
           value.isChecked = false;
           value.quantityController.clear();
@@ -154,9 +149,7 @@ class _ButcherRequisitionScreenState
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
