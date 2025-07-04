@@ -1,13 +1,15 @@
 // lib/staff_wrapper_screen.dart
-// V2: Converted to use a TabBar at the top instead of a BottomNavigationBar.
+// V3: Added notification bell and fixed view-switching logic.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'staff_home_screen.dart';
-import 'staff_inventory_count_screen.dart'; // Ensure this is the correct screen for inventory
+import 'staff_inventory_count_screen.dart';
 import 'providers.dart';
+import 'home_screen.dart'; // Import to access the view provider
+import 'widgets/notification_bell_widget.dart'; // Import the new bell widget
 
 class StaffWrapperScreen extends ConsumerWidget {
   const StaffWrapperScreen({super.key});
@@ -22,20 +24,23 @@ class StaffWrapperScreen extends ConsumerWidget {
         appBar: AppBar(
           title: const Text('Staff Dashboard'),
           actions: [
-            // This button allows an Admin to switch back to the Admin view
+            // This is the new notification bell.
+            const NotificationBellWidget(),
+
+            // This button allows an Admin to switch back to the Admin view.
             if (appUser?.role == 'Admin')
               Tooltip(
                 message: 'Switch to Admin View',
                 child: IconButton(
                   icon: const Icon(Icons.admin_panel_settings),
+                  // CORRECTED: This now uses the provider to correctly switch views.
                   onPressed: () {
-                    // This logic assumes you have a way to switch views,
-                    // for now, we'll just sign out as a placeholder if needed.
-                    // Ideally, you'd have a provider to toggle the view.
-                    FirebaseAuth.instance.signOut();
+                    ref.read(isViewingAsStaffProvider.notifier).state = false;
                   },
                 ),
               ),
+
+            // The standard logout button.
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () => FirebaseAuth.instance.signOut(),

@@ -342,13 +342,23 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        // --- THIS IS THE FIX ---
+        Center(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
         const SizedBox(height: 10),
         tasksAsync.when(
           loading: () => const CircularProgressIndicator(),
           error: (err, stack) => Text('Error: ${err.toString()}'),
           data: (docs) {
-            if (docs.isEmpty) return Text(isEmptyMessage, style: const TextStyle(fontStyle: FontStyle.italic));
+            if (docs.isEmpty) {
+              return Center(
+                child: Text(isEmptyMessage, style: const TextStyle(fontStyle: FontStyle.italic)),
+              );
+            }
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),

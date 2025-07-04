@@ -1,5 +1,5 @@
 // lib/providers.dart
-// V23: Replaced allOpenRequisitionsProvider with a family provider.
+// FINAL: Adds a new provider to control the notification bell's blinking state.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -30,6 +30,7 @@ class AppUser {
   const AppUser({ required this.uid, this.email, this.fullName, required this.role, required this.isApproved, required this.isEmailVerified });
 }
 
+
 final appUserProvider = StreamProvider<AppUser?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges().asyncMap((user) async {
     if (user == null) return null;
@@ -55,6 +56,50 @@ final appUserProvider = StreamProvider<AppUser?>((ref) {
     return AppUser(uid: refreshedUser.uid, email: refreshedUser.email, fullName: data['fullName'], role: data['role'] ?? 'Unassigned', isApproved: data['isApproved'] ?? false, isEmailVerified: refreshedUser.emailVerified);
   });
 });
+
+// lib/providers.dart
+
+// ... (keep all existing code before this section)
+
+// ==== Notification and Request Providers ====
+
+final tomorrowsFloorStaffPrepTasksProvider = StreamProvider.autoDispose<Set<String>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final tomorrowFormattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+  return firestore
+      .collection('dailyTodoLists')
+      .doc(tomorrowFormattedDate)
+      .collection('prepTasks')
+      .where('category', isEqualTo: 'Floor Staff Report')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => doc['originalFloorChecklistItemId'] as String).toSet());
+});
+
+final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final tomorrow = DateFormat('yyyy-MM-dd')
+      .format(DateTime.now().add(const Duration(days: 1)));
+
+  final todayButcherReqs = firestore
+      .collection('dailyTodoLists')
+      .doc(today)
+      .collection('stockRequisitions')
+      .where('isCompleted', isEqualTo: false)
+      .snapshots();
+
+  final tomorrowButcherReqs = firestore
+      .collection('dailyTodoLists')
+      .doc(tomorrow)
+      .collection('stockRequisitions')
+      .where('isCompleted', isEqualTo: false)
+      .snapshots();
+
+  return Rx.combineLatest2(todayButcherReqs, tomorrowButcherReqs,
+          (QuerySnapshot today, QuerySnapshot tomorrow) => today.size + tomorrow.size);
+});
+
+// ... (keep all existing code after this section, like allOpenStockRequisitionsProvider, etc.)
 
 final unapprovedUsersCountProvider = StreamProvider.autoDispose<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
@@ -304,7 +349,6 @@ final categoriesStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref)
 final suppliersStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('suppliers').orderBy('name').snapshots());
 final locationsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) => ref.watch(firestoreProvider).collection('locations').orderBy('name').snapshots());
 
-
 // ==== Add/Edit Inventory Item Providers ====
 final inventoryItemProvider = FutureProvider.autoDispose.family<InventoryItem?, String>((ref, docId) async {
   if (docId.isEmpty) return null;
@@ -427,7 +471,7 @@ class EditDishController extends StateNotifier<EditDishState> {
     if (initialDish != null) {
       _loadDish(initialDish);
     } else {
-      state = EditDishState(dish: AsyncValue.data(Dish(id: '', dishName: '', category: '', recipeInstructions: '', isActive: true, isComponent: isCreatingComponent)));
+      state = EditDishState(dish: AsyncValue.data(Dish(id: '', dishName: '', category: '', recipeInstructions: '', isActive: true, isComponent: isCreatingComponent, prepTasks: [])));
     }
   }
 
@@ -463,16 +507,12 @@ class EditDishController extends StateNotifier<EditDishState> {
 
     state = state.copyWith(
       dish: AsyncValue.data(
-          Dish(
-            id: currentDish.id,
-            dishName: dishName ?? currentDish.dishName,
-            category: category ?? currentDish.category,
-            recipeInstructions: instructions ?? currentDish.recipeInstructions,
-            isActive: isActive ?? currentDish.isActive,
-            isComponent: isComponent ?? currentDish.isComponent,
-            lastUpdated: currentDish.lastUpdated,
-            ingredients: currentDish.ingredients,
-            prepTasks: currentDish.prepTasks,
+          currentDish.copyWith(
+            dishName: dishName,
+            category: category,
+            recipeInstructions: instructions,
+            isActive: isActive,
+            isComponent: isComponent,
           )
       ),
     );
@@ -584,15 +624,44 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
 });
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
 final showCompletedTasksProvider = StateProvider<bool>((ref) => false);
+
+// ==== Notification and Request Providers ====
+final allOpenStockRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+
+  final todayStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+  final tomorrowStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+
+  return Rx.combineLatest2(
+    todayStream,
+    tomorrowStream,
+        (QuerySnapshot todaySnapshot, QuerySnapshot tomorrowSnapshot) {
+      return [...todaySnapshot.docs, ...tomorrowSnapshot.docs];
+    },
+  );
+});
+
 final newBarRequestsProvider = StreamProvider.autoDispose<List<DocumentSnapshot>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final currentStaffDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   return firestore.collection('dailyTodoLists').doc(currentStaffDate).collection('barRequests').where('isCompleted', isEqualTo: false).snapshots().map((snapshot) => snapshot.docs);
 });
-final tomorrowsFloorStaffPrepTasksProvider = StreamProvider.autoDispose<Set<String>>((ref) {
-  final firestore = ref.watch(firestoreProvider);
-  final tomorrowFormattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
-  return firestore.collection('dailyTodoLists').doc(tomorrowFormattedDate).collection('prepTasks').where('category', isEqualTo: 'Floor Staff Report').snapshots().map((snapshot) => snapshot.docs.map((doc) => doc['originalFloorChecklistItemId'] as String).toSet());
+
+// NEW PROVIDER FOR BLINKING LOGIC
+final hasOpenRequestsProvider = StreamProvider.autoDispose<bool>((ref) {
+  final butcherReqs = ref.watch(allOpenStockRequisitionsProvider.stream);
+  final barReqs = ref.watch(newBarRequestsProvider.stream);
+
+  return Rx.combineLatest2(
+    butcherReqs,
+    barReqs,
+        (List<DocumentSnapshot> butcher, List<DocumentSnapshot> bar) {
+      // If either list has items, return true.
+      return butcher.isNotEmpty || bar.isNotEmpty;
+    },
+  );
 });
 
 // ==== Analytics Providers ====
@@ -629,41 +698,4 @@ final mostUsedIngredientsProvider = FutureProvider.autoDispose.family<List<Analy
 final taskCompletionProvider = FutureProvider.autoDispose.family<List<TaskChampion>, DateTimeRange>((ref, dateRange) {
   final controller = ref.watch(analyticsControllerProvider);
   return controller.getTaskCompletionStats(startDate: dateRange.start, endDate: dateRange.end);
-});
-
-// ==== Admin Dashboard Providers ====
-final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
-  final firestore = ref.watch(firestoreProvider);
-  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-  final tomorrow = DateFormat('yyyy-MM-dd')
-      .format(DateTime.now().add(const Duration(days: 1)));
-
-  final todayButcherReqs = firestore
-      .collection('dailyTodoLists')
-      .doc(today)
-      .collection('stockRequisitions')
-      .where('isCompleted', isEqualTo: false)
-      .snapshots();
-
-  final tomorrowButcherReqs = firestore
-      .collection('dailyTodoLists')
-      .doc(tomorrow)
-      .collection('stockRequisitions')
-      .where('isCompleted', isEqualTo: false)
-      .snapshots();
-
-  return Rx.combineLatest2(todayButcherReqs, tomorrowButcherReqs,
-          (QuerySnapshot today, QuerySnapshot tomorrow) => today.size + tomorrow.size);
-});
-
-// CORRECTED: This provider now takes a date string to fetch requisitions for a specific day.
-final stockRequisitionsProvider = StreamProvider.autoDispose.family<List<QueryDocumentSnapshot>, String>((ref, dateString) {
-  final firestore = ref.watch(firestoreProvider);
-  return firestore
-      .collection('dailyTodoLists')
-      .doc(dateString)
-      .collection('stockRequisitions')
-      .where('isCompleted', isEqualTo: false)
-      .snapshots()
-      .map((snapshot) => snapshot.docs);
 });
