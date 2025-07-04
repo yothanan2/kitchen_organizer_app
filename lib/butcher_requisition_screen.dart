@@ -1,24 +1,40 @@
 // lib/butcher_requisition_screen.dart
-// FIXED: Corrected a type error when building the units dropdown.
+// FINAL: This version introduces a local Unit model to resolve type errors.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:collection/collection.dart';
 import 'providers.dart';
-import 'models/models.dart';
 
-// Define RequisitionFormData here, as it's specific to this screen
+// --- Local data models to solve the type errors ---
+class Unit {
+  final String id;
+  final String name;
+  Unit({required this.id, required this.name});
+
+  factory Unit.fromFirestore(Map<String, dynamic> data, String documentId) {
+    return Unit(
+      id: documentId,
+      name: data['name'] ?? 'Unnamed Unit',
+    );
+  }
+}
+
 class RequisitionFormData {
   bool isChecked;
   final TextEditingController quantityController;
-  DocumentReference? selectedUnitRef; // Now stores a DocumentReference
-  RequisitionFormData() : isChecked = false, quantityController = TextEditingController();
+  DocumentReference? selectedUnitRef;
+  RequisitionFormData()
+      : isChecked = false,
+        quantityController = TextEditingController();
 }
+// --- End of local data models ---
 
-// This provider now fetches the curated list you created as an admin.
-final butcherRequestableItemsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
+final butcherRequestableItemsProvider =
+StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('butcher_request_items')
@@ -27,15 +43,16 @@ final butcherRequestableItemsProvider = StreamProvider.autoDispose<List<QueryDoc
       .map((snapshot) => snapshot.docs);
 });
 
-
 class ButcherRequisitionScreen extends ConsumerStatefulWidget {
   const ButcherRequisitionScreen({super.key});
 
   @override
-  ConsumerState<ButcherRequisitionScreen> createState() => _ButcherRequisitionScreenState();
+  ConsumerState<ButcherRequisitionScreen> createState() =>
+      _ButcherRequisitionScreenState();
 }
 
-class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScreen> {
+class _ButcherRequisitionScreenState
+    extends ConsumerState<ButcherRequisitionScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   bool _isLoading = false;
   final Map<String, RequisitionFormData> _formState = {};
@@ -50,11 +67,10 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)));
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
     }
@@ -63,23 +79,32 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
   Future<void> _submitRequisition() async {
     setState(() => _isLoading = true);
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
     final List<Map<String, dynamic>> itemsToSubmit = [];
+    final allRequestableItemsSnapshot =
+    await ref.read(butcherRequestableItemsProvider.future);
 
     _formState.forEach((docId, formData) {
-      if (formData.isChecked && formData.quantityController.text.isNotEmpty && formData.selectedUnitRef != null) {
-        itemsToSubmit.add({
-          'itemDocId': docId,
-          'quantity': formData.quantityController.text,
-          'unitRef': formData.selectedUnitRef!,
-        });
+      if (formData.isChecked &&
+          formData.quantityController.text.isNotEmpty &&
+          formData.selectedUnitRef != null) {
+        final originalItemDoc =
+        allRequestableItemsSnapshot.firstWhereOrNull((doc) => doc.id == docId);
+        if (originalItemDoc != null) {
+          itemsToSubmit.add({
+            'itemRef': originalItemDoc.reference,
+            'itemName':
+            (originalItemDoc.data() as Map<String, dynamic>)['name'],
+            'quantity': formData.quantityController.text,
+            'unitRef': formData.selectedUnitRef!,
+          });
+        }
       }
     });
 
     if (itemsToSubmit.isEmpty) {
-      scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Please check and fill out at least one item."), backgroundColor: Colors.orange));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Please check and fill out at least one item."),
+          backgroundColor: Colors.orange));
       setState(() => _isLoading = false);
       return;
     }
@@ -92,38 +117,46 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
 
     final unitsMap = await ref.read(unitsMapProvider.future);
 
-    final itemDocs = await firestore.collection('butcher_request_items').where(FieldPath.documentId, whereIn: itemsToSubmit.map((item) => item['itemDocId'] as String).toList()).get();
-    final itemNames = { for (var doc in itemDocs.docs) doc.id: (doc.data())['name'] ?? 'Unknown' };
-
-
     for (final submissionItem in itemsToSubmit) {
       final unitName = unitsMap[submissionItem['unitRef'].id] ?? '';
-      final itemName = itemNames[submissionItem['itemDocId']] ?? 'Unknown Item';
-
       final taskRef = listDocRef.collection('stockRequisitions').doc();
       batch.set(taskRef, {
-        'taskName': 'From Butcher: ${submissionItem['quantity']} $unitName of $itemName',
+        'taskName':
+        'From Butcher: ${submissionItem['quantity']} $unitName of ${submissionItem['itemName']}',
         'category': 'Butcher Requisition',
         'requestedBy': appUser?.fullName ?? 'Butcher',
         'createdAt': FieldValue.serverTimestamp(),
-        'isCompleted': false,
-        'originalRequestItemRef': firestore.collection('butcher_request_items').doc(submissionItem['itemDocId']),
+        'inventoryItemRef': submissionItem['itemRef'],
         'quantity': num.tryParse(submissionItem['quantity']) ?? 0,
         'unitRef': submissionItem['unitRef'],
+        'isCompleted': false,
       });
     }
 
     try {
       await batch.commit();
-      scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Requisition submitted successfully!"), backgroundColor: Colors.green));
       if (mounted) {
-        navigator.pop();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Requisition submitted successfully!"),
+            backgroundColor: Colors.green));
+        _formState.forEach((key, value) {
+          value.isChecked = false;
+          value.quantityController.clear();
+          value.selectedUnitRef = null;
+        });
+        setState(() {});
       }
-    } catch(e) {
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text("Failed to submit requisition: $e"), backgroundColor: Colors.red));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text("Failed to submit requisition: $e"),
+            backgroundColor: Colors.red));
+      }
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -143,7 +176,11 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
               child: ListTile(
                 leading: const Icon(Icons.calendar_today),
                 title: const Text("Requisition for Date"),
-                subtitle: Text(DateFormat('EEEE, MMMM d, yyyy').format(_selectedDate), style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Theme.of(context).primaryColor)),
+                subtitle: Text(DateFormat('EEEE, MMMM d, yyyy').format(_selectedDate),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: Theme.of(context).primaryColor)),
                 onTap: () => _selectDate(context),
               ),
             ),
@@ -153,12 +190,18 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: ElevatedButton.icon(
               onPressed: _isLoading ? null : _submitRequisition,
-              icon: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.send),
+              icon: _isLoading
+                  ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child:
+                  CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.send),
               label: const Text("Submit Requisition to Kitchen"),
               style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
-                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-              ),
+                  textStyle: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -178,16 +221,21 @@ class _RequisitionList extends ConsumerWidget {
     return Expanded(
       child: requestableItemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text("Error: $err\n\nThis may be due to a missing Firestore Index. Please check the debug console for a link to create it.", textAlign: TextAlign.center),
-        )),
+        error: (err, stack) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                  "Error: $err\n\nThis may be due to a missing Firestore Index. Please check the debug console for a link to create it.",
+                  textAlign: TextAlign.center),
+            )),
         data: (snapshot) {
           if (snapshot.isEmpty) {
-            return const Center(child: Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Text("No items have been configured for the butcher by an Admin yet."),
-            ));
+            return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Text(
+                      "No items have been configured for the butcher by an Admin yet."),
+                ));
           }
 
           for (final doc in snapshot) {
@@ -200,7 +248,8 @@ class _RequisitionList extends ConsumerWidget {
             itemCount: snapshot.length,
             itemBuilder: (context, index) {
               final itemDoc = snapshot[index];
-              return _RequisitionItemTile(itemDoc: itemDoc, formData: formState[itemDoc.id]!);
+              return _RequisitionItemTile(
+                  itemDoc: itemDoc, formData: formState[itemDoc.id]!);
             },
           );
         },
@@ -222,7 +271,10 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
   Widget build(BuildContext context) {
     final data = widget.itemDoc.data() as Map<String, dynamic>;
     final itemName = data['name'] ?? 'Unnamed';
-    final List<DocumentReference> allowedUnitRefs = data['allowedUnitRefs'] != null
+    final source = data['source'] as String?;
+
+    final List<DocumentReference> allowedUnitRefs =
+    data['allowedUnitRefs'] != null
         ? List<DocumentReference>.from(data['allowedUnitRefs'])
         : [];
 
@@ -234,18 +286,41 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
           children: [
             Checkbox(
               value: widget.formData.isChecked,
-              onChanged: (value) => setState(() => widget.formData.isChecked = value ?? false),
+              onChanged: (value) =>
+                  setState(() => widget.formData.isChecked = value ?? false),
             ),
-            Expanded(flex: 3, child: Text(itemName, style: const TextStyle(fontSize: 16))),
+            Expanded(
+                flex: 3,
+                child: RichText(
+                  text: TextSpan(
+                    style: DefaultTextStyle.of(context).style,
+                    children: <TextSpan>[
+                      TextSpan(
+                          text: itemName, style: const TextStyle(fontSize: 16)),
+                      if (source != null)
+                        TextSpan(
+                            text: ' ($source)',
+                            style: const TextStyle(
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey)),
+                    ],
+                  ),
+                )),
             const SizedBox(width: 8),
             Expanded(
               flex: 2,
               child: TextFormField(
                 controller: widget.formData.quantityController,
                 enabled: widget.formData.isChecked,
-                decoration: const InputDecoration(labelText: 'Amount', isDense: true, border: OutlineInputBorder()),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    isDense: true,
+                    border: OutlineInputBorder()),
+                keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -255,7 +330,13 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
                   future: _fetchUnits(allowedUnitRefs),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2,)));
+                      return const Center(
+                          child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              )));
                     }
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return const Text("No Units");
@@ -263,21 +344,31 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
 
                     final units = snapshot.data!;
 
+                    final unitDropdownItems = units.map((unit) {
+                      return DropdownMenuItem<DocumentReference>(
+                          value: FirebaseFirestore.instance
+                              .collection('units')
+                              .doc(unit.id),
+                          child: Text(unit.name));
+                    }).toList();
+
+                    final currentUnitId = widget.formData.selectedUnitRef;
+
+                    final valueExists = unitDropdownItems
+                        .any((item) => item.value?.id == currentUnitId?.id);
+
                     return DropdownButtonFormField<DocumentReference>(
-                      value: widget.formData.selectedUnitRef,
+                      value: valueExists ? currentUnitId : null,
                       hint: const Text("Unit"),
-                      items: units.map((unit) => DropdownMenuItem(
-                        // --- THIS IS THE FIX ---
-                          value: FirebaseFirestore.instance.collection('units').doc(unit.id),
-                          child: Text(unit.name)
-                      )).toList(),
+                      items: unitDropdownItems,
                       onChanged: widget.formData.isChecked
-                          ? (value) => setState(() => widget.formData.selectedUnitRef = value)
+                          ? (value) =>
+                          setState(() => widget.formData.selectedUnitRef = value)
                           : null,
-                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                          isDense: true, border: OutlineInputBorder()),
                     );
-                  }
-              ),
+                  }),
             ),
           ],
         ),
@@ -285,10 +376,14 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
     );
   }
 
+  // This function now correctly returns a list of Unit objects
   Future<List<Unit>> _fetchUnits(List<DocumentReference> refs) async {
     if (refs.isEmpty) return [];
     final unitFutures = refs.map((ref) => ref.get()).toList();
     final unitSnapshots = await Future.wait(unitFutures);
-    return unitSnapshots.map((doc) => Unit.fromFirestore(doc.data() as Map<String, dynamic>, doc.id)).toList();
+    return unitSnapshots
+        .map((doc) =>
+        Unit.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
+        .toList();
   }
 }

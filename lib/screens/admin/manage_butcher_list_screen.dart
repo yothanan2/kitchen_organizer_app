@@ -1,5 +1,5 @@
 // lib/screens/admin/manage_butcher_list_screen.dart
-// FIXED: Added equality checks to ButcherListItem to fix editing bug.
+// FIXED: Now correctly searches both 'inventoryItems' and 'dishes'.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,10 +10,9 @@ import '../../providers.dart';
 // A simple data class to hold our combined item data
 class ButcherListItem {
   final String name;
-  final String source;
+  final String source; // e.g., 'Inventory', 'Dish', 'Component'
   ButcherListItem({required this.name, required this.source});
 
-  // --- FIX: Added equality operator and hashCode for proper object comparison ---
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -36,6 +35,7 @@ class ManageButcherListScreen extends ConsumerStatefulWidget {
 
 class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScreen> {
 
+  // This function shows the dialog for adding or editing an item.
   void _showItemDialog(BuildContext context, {DocumentSnapshot? document, int currentItemCount = 0}) {
     ButcherListItem? selectedItem;
     List<String> selectedUnitIds = [];
@@ -53,6 +53,8 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
       }
     }
 
+    // --- THIS IS THE CORRECTED FUNCTION ---
+    // It now fetches from both 'inventoryItems' and 'dishes' collections.
     Future<List<ButcherListItem>> getData(String? filter) async {
       final firestore = FirebaseFirestore.instance;
       final inventoryFuture = firestore.collection('inventoryItems').get();
@@ -64,6 +66,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
 
       final List<ButcherListItem> combinedList = [];
 
+      // Add inventory items
       for (var doc in inventorySnapshot.docs) {
         final data = doc.data();
         combinedList.add(ButcherListItem(
@@ -72,6 +75,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
         ));
       }
 
+      // Add dishes and components
       for (var doc in dishesSnapshot.docs) {
         final data = doc.data();
         combinedList.add(ButcherListItem(
@@ -80,7 +84,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
         ));
       }
 
-      combinedList.sort((a, b) => a.name.compareTo(b.name));
+      combinedList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       return combinedList;
     }
 
@@ -117,7 +121,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
                           },
                         ),
                         dropdownDecoratorProps: const DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(labelText: "Select an Item", border: OutlineInputBorder()),
+                          dropdownSearchDecoration: InputDecoration(labelText: "Select an Item or Dish", border: OutlineInputBorder()),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -141,9 +145,9 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
                               return DropdownSearch<String>.multiSelection(
                                 items: allUnits.map((doc) => (doc.data() as Map<String, dynamic>)['name'] as String).toList(),
                                 selectedItems: initialSelectedNames,
-                                popupProps: PopupPropsMultiSelection.menu(
+                                popupProps: const PopupPropsMultiSelection.menu(
                                   showSearchBox: true,
-                                  itemBuilder: (context, item, isSelected) => ListTile(title: Text(item)),
+                                  showSelectedItems: true,
                                 ),
                                 dropdownDecoratorProps: const DropDownDecoratorProps(
                                   dropdownSearchDecoration: InputDecoration(
@@ -184,6 +188,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
                       final dataToSave = {
                         'name': selectedItem!.name,
                         'allowedUnitRefs': unitRefs,
+                        'source': selectedItem!.source, // Also save the source for clarity
                       };
 
                       if (isEditing) {
@@ -266,17 +271,13 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}"));
           }
-
           final items = snapshot.data?.docs ?? [];
-
           if(items.isNotEmpty) {
             _backfillOrderField(items);
           }
-
           return ReorderableListView.builder(
             padding: const EdgeInsets.only(bottom: 80),
             itemCount: items.length,
@@ -284,11 +285,9 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
               final item = items[index];
               final data = item.data() as Map<String, dynamic>?;
               final itemName = data?['name'] ?? 'Unnamed';
-
               final List<DocumentReference> unitRefs = data?['allowedUnitRefs'] != null
                   ? List<DocumentReference>.from(data?['allowedUnitRefs'])
                   : [];
-
               return ListTile(
                 key: ValueKey(item.id),
                 title: Text(itemName),

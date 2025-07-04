@@ -1,10 +1,12 @@
 // lib/staff_home_screen.dart
-// V3: Removed the Scaffold and AppBar since this is now a child view of a TabBar.
+// FINAL CORRECTED VERSION: This version uses a robust method to fetch and
+// display requisitions for today and tomorrow, independent of the date picker.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:rxdart/rxdart.dart';
 
 import 'preparation_screen.dart';
 import 'providers.dart';
@@ -80,6 +82,33 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     }
   }
 
+  // --- THIS IS THE NEW, ROBUST WAY TO GET THE REQUISITIONS ---
+  Stream<List<DocumentSnapshot>> _getOpenRequisitions() {
+    final firestore = ref.read(firestoreProvider);
+    final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+
+    final todayStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+    final tomorrowStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
+
+    return Rx.combineLatest2(
+      todayStream,
+      tomorrowStream,
+          (QuerySnapshot today, QuerySnapshot tomorrow) {
+        final combined = [...today.docs, ...tomorrow.docs];
+        // Optional: sort by time if you have a timestamp field
+        combined.sort((a, b) {
+          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+          if (aTime == null || bTime == null) return 0;
+          return aTime.compareTo(bTime);
+        });
+        return combined;
+      },
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final DateTime selectedDate = ref.watch(selectedDateProvider);
@@ -90,14 +119,10 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     final showCompleted = ref.watch(showCompletedTasksProvider);
     final prepTasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: false, date: selectedDateString)));
     final completedPrepTasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: true, date: selectedDateString)));
-
-    final stockReqsAsync = ref.watch(allOpenRequisitionsProvider);
     final completedStockReqsAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'stockRequisitions', isCompleted: true, date: selectedDateString)));
-
     final newBarRequestsAsync = ref.watch(newBarRequestsProvider);
     final unitsMapAsync = ref.watch(unitsMapProvider);
 
-    // REMOVED Scaffold and AppBar. Now returns the direct layout.
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -117,9 +142,27 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
           ),
           const SizedBox(height: 16),
           _buildDateSelector(context, selectedDate),
-          Text(DateFormat('EEEE, MMM d').format(selectedDate), style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
-          _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, stockReqsAsync, showCompleted, completedPrepTasksAsync, completedStockReqsAsync, unitsMapAsync, selectedDate),
+
+          // --- THIS SECTION IS NOW SEPARATE AND ALWAYS SHOWS TODAY/TOMORROW ---
+          StreamBuilder<List<DocumentSnapshot>>(
+            stream: _getOpenRequisitions(),
+            builder: (context, snapshot) {
+              return _buildTasksSection(
+                context,
+                title: 'Open Stock Requisitions (Today & Tomorrow)',
+                tasksAsync: snapshot.hasData
+                    ? AsyncValue.data(snapshot.data!)
+                    : const AsyncValue.loading(),
+                onToggle: _toggleTaskCompletion,
+                isEmptyMessage: 'No open stock requisitions.',
+                isButcherRequisition: true,
+                unitsMapAsync: unitsMapAsync,
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, showCompleted, completedPrepTasksAsync, completedStockReqsAsync, unitsMapAsync, selectedDate),
         ],
       ),
     );
@@ -183,11 +226,8 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       margin: const EdgeInsets.only(bottom: 16.0),
       child: ListTile(
         leading: const Icon(Icons.calendar_today),
-        title: const Text("Viewing Tasks For:"),
-        subtitle: Text(
-          selectedDate.isAtSameMomentAs(DateTime.now().toLocal().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0))
-              ? 'Today (${DateFormat('EEEE, MMM d').format(selectedDate)})'
-              : DateFormat('EEEE, MMM d, yyyy').format(selectedDate),
+        title: Text(
+          "Viewing Prep Tasks For: ${DateFormat('EEEE, MMM d').format(selectedDate)}",
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         trailing: const Icon(Icons.arrow_drop_down),
@@ -241,7 +281,6 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       AsyncValue<bool> isTodaysListGenerated,
       BuildContext context,
       AsyncValue<QuerySnapshot> prepTasksAsync,
-      AsyncValue<List<QueryDocumentSnapshot>> stockReqsAsync,
       bool showCompleted,
       AsyncValue<QuerySnapshot> completedPrepTasksAsync,
       AsyncValue<QuerySnapshot> completedStockReqsAsync,
@@ -251,7 +290,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Text('Error: ${err.toString()}'),
       data: (exists) {
-        if (!exists) {
+        if (!exists && selectedDate.isAtSameMomentAs(DateTime.now().toLocal().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0))) {
           return Card(
             color: Colors.blue.shade50,
             margin: const EdgeInsets.only(top: 16),
@@ -278,9 +317,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
 
         return Column(
           children: [
-            _buildTasksSection(context, title: 'Today\'s Prep Tasks', tasksAsync: prepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No prep tasks for this date.', unitsMapAsync: unitsMapAsync),
-            const SizedBox(height: 20),
-            _buildTasksSection(context, title: 'What to Bring to the Kitchen', tasksAsync: stockReqsAsync, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No stock requisitions.', isButcherRequisition: true, unitsMapAsync: unitsMapAsync),
+            _buildTasksSection(context, title: 'Prep Tasks for ${DateFormat('MMM d').format(selectedDate)}', tasksAsync: prepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No prep tasks for this date.', unitsMapAsync: unitsMapAsync),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -322,10 +359,10 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                 final String taskName = taskData['taskName'] ?? 'Unnamed Task';
                 final bool isCompleted = taskData['isCompleted'] ?? false;
                 final String? completedBy = taskData['completedBy'];
-                final Timestamp? completedAt = taskData['createdAt'];
+                final Timestamp? createdAt = taskData['createdAt'];
                 String completionInfo = '';
-                if (isCompleted && completedBy != null && completedAt != null) {
-                  final formattedTime = DateFormat('hh:mm a, MMM d').format(completedAt.toDate());
+                if (isCompleted && completedBy != null && createdAt != null) {
+                  final formattedTime = DateFormat('hh:mm a, MMM d').format(createdAt.toDate());
                   completionInfo = 'Completed by $completedBy at $formattedTime';
                 }
 
@@ -341,6 +378,8 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                   subtitleText = 'Quantity: $quantity $unitName - Requested by $requestedBy';
                   if (isCompleted && completionInfo.isNotEmpty) {
                     subtitleText += '\n$completionInfo';
+                  } else if (createdAt != null) {
+                    subtitleText += '\nRequested on ${DateFormat('MMM d').format(createdAt.toDate())}';
                   }
                 } else if (isCompleted && completionInfo.isNotEmpty) {
                   subtitleText = completionInfo;
