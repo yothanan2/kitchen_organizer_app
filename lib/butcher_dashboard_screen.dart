@@ -1,5 +1,5 @@
 // lib/butcher_dashboard_screen.dart
-// UPDATED: Replaced private note cards with the reusable DailyNoteCard widget.
+// UPDATED: Centered all header text widgets.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +10,7 @@ import 'package:intl/intl.dart';
 import 'providers.dart';
 import 'butcher_requisition_screen.dart';
 import 'widgets/weather_card_widget.dart';
-import 'widgets/daily_note_card_widget.dart'; // <-- NEW IMPORT
+import 'widgets/daily_note_card_widget.dart';
 
 class ButcherDashboardScreen extends ConsumerWidget {
   const ButcherDashboardScreen({super.key});
@@ -19,7 +19,6 @@ class ButcherDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appUser = ref.watch(appUserProvider).value;
     final displayName = appUser?.fullName?.split(' ').first ?? 'Butcher';
-    final dateString = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
@@ -30,19 +29,17 @@ class ButcherDashboardScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(weatherProvider);
-          ref.invalidate(dailyTodoListDocProvider(dateString));
+          ref.invalidate(dailyTodoListDocProvider(ref.read(todayDocIdProvider(DateTime.now()))));
         },
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const WeatherCard(),
                 const SizedBox(height: 16),
-                // NEW: Added the daily note card for butcher staff
-                const DailyNoteCard(noteFieldName: 'forButcherStaff'),
-                _KitchenNoteForButcherCard(dateString: dateString), // Keep this for now
-                const SizedBox(height: 24),
+
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ButcherRequisitionScreen()));
@@ -60,11 +57,16 @@ class ButcherDashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  "Other butcher tools will appear here.",
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                  textAlign: TextAlign.center,
+
+                const DailyNoteCard(noteFieldName: 'forButcherStaff'),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 12),
+                Center( // <-- UPDATED
+                    child: Text("Today's Requisitions", style: Theme.of(context).textTheme.headlineSmall)
                 ),
+                const SizedBox(height: 8),
+                const _RequestedItemsList(),
               ],
             ),
           ),
@@ -74,44 +76,128 @@ class ButcherDashboardScreen extends ConsumerWidget {
   }
 }
 
-// This specific note from the kitchen can remain a private widget for now.
-class _KitchenNoteForButcherCard extends ConsumerWidget {
-  final String dateString;
-  const _KitchenNoteForButcherCard({required this.dateString});
+class _RequestedItemsList extends StatelessWidget {
+  const _RequestedItemsList();
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _getRequisitionsStream() {
+    final firestore = FirebaseFirestore.instance;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return firestore
+        .collection('dailyTodoLists')
+        .doc(today)
+        .collection('stockRequisitions')
+        .where('category', isEqualTo: 'Butcher Requisition')
+        .snapshots();
+  }
+
+  Future<void> _markAsReceived(DocumentReference taskRef) async {
+    await taskRef.update({'isCompleted': true});
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dailyDocAsync = ref.watch(dailyTodoListDocProvider(dateString));
-    return dailyDocAsync.when(
-      data: (doc) {
-        if (!doc.exists) return const SizedBox.shrink();
-        final data = doc.data() as Map<String, dynamic>;
-        final note = data['kitchenToButcherNote'] as String?;
-        if (note == null || note.trim().isEmpty) return const SizedBox.shrink();
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          color: Colors.lightBlue.shade100,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.soup_kitchen_outlined, color: Colors.blue.shade800),
-                    const SizedBox(width: 8),
-                    Text("Note from the Kitchen", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue.shade900, fontFamily: 'DistinctStyleSans')),
-                  ],
-                ),
-                const Divider(height: 16),
-                Text(note, style: const TextStyle(fontSize: 15)),
-              ],
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _getRequisitionsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text("Error loading requisitions: ${snapshot.error}"));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Text("No items requested for today.", style: TextStyle(color: Colors.grey)),
             ),
-          ),
+          );
+        }
+
+        final docs = snapshot.data!.docs;
+        final pending = docs.where((doc) => (doc.data() as Map<String, dynamic>)['isCompleted'] == false).toList();
+        final completed = docs.where((doc) => (doc.data() as Map<String, dynamic>)['isCompleted'] == true).toList();
+
+        if (pending.isEmpty && completed.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Text("No items requested for today.", style: TextStyle(color: Colors.grey)),
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if(pending.isNotEmpty)
+              _buildTaskList(
+                context: context,
+                title: 'Pending Receipt',
+                tasks: pending,
+                isPending: true,
+                onTap: (doc) => _markAsReceived(doc.reference),
+              ),
+
+            if (completed.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _buildTaskList(
+                context: context,
+                title: 'Received Today',
+                tasks: completed,
+                isPending: false,
+              ),
+            ]
+          ],
         );
       },
-      loading: () => const SizedBox.shrink(),
-      error: (e,s) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildTaskList({
+    required BuildContext context,
+    required String title,
+    required List<DocumentSnapshot> tasks,
+    required bool isPending,
+    Function(DocumentSnapshot)? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center( // <-- UPDATED
+            child: Text(title, style: Theme.of(context).textTheme.titleLarge)
+        ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          itemCount: tasks.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            final task = tasks[index];
+            final data = task.data() as Map<String, dynamic>;
+            final taskName = data['taskName'] ?? 'Unnamed Task';
+            return Card(
+              elevation: 2,
+              color: isPending ? null : Colors.grey.shade200,
+              child: ListTile(
+                title: Text(
+                  taskName,
+                  style: TextStyle(
+                    decoration: isPending ? null : TextDecoration.lineThrough,
+                    color: isPending ? null : Colors.grey.shade700,
+                  ),
+                ),
+                trailing: isPending
+                    ? ElevatedButton(
+                  onPressed: () => onTap?.call(task),
+                  child: const Text('Mark Received'),
+                )
+                    : const Icon(Icons.check_circle, color: Colors.green),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

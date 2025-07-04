@@ -1,5 +1,5 @@
 // lib/screens/admin/manage_butcher_list_screen.dart
-// FINAL FIX V3: Applied all manual corrections for stability.
+// FIXED: Added equality checks to ButcherListItem to fix editing bug.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,6 +12,18 @@ class ButcherListItem {
   final String name;
   final String source;
   ButcherListItem({required this.name, required this.source});
+
+  // --- FIX: Added equality operator and hashCode for proper object comparison ---
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is ButcherListItem &&
+              runtimeType == other.runtimeType &&
+              name == other.name &&
+              source == other.source;
+
+  @override
+  int get hashCode => name.hashCode ^ source.hashCode;
 }
 
 class ManageButcherListScreen extends ConsumerStatefulWidget {
@@ -30,7 +42,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
     final bool isEditing = document != null;
 
     if (isEditing) {
-      final data = document.data() as Map<String, dynamic>?;
+      final data = document!.data() as Map<String, dynamic>?;
       if (data != null) {
         selectedItem = ButcherListItem(name: data['name'] ?? '', source: 'Pre-selected');
         if (data['allowedUnitRefs'] != null) {
@@ -175,7 +187,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
                       };
 
                       if (isEditing) {
-                        collection.doc(document!.id).update(dataToSave);
+                        collection.doc(document.id).update(dataToSave);
                       } else {
                         collection.add({...dataToSave, 'order': currentItemCount});
                       }
@@ -274,7 +286,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
               final itemName = data?['name'] ?? 'Unnamed';
 
               final List<DocumentReference> unitRefs = data?['allowedUnitRefs'] != null
-                  ? List<DocumentReference>.from(data!['allowedUnitRefs'])
+                  ? List<DocumentReference>.from(data?['allowedUnitRefs'])
                   : [];
 
               return ListTile(
