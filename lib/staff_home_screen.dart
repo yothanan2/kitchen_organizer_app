@@ -11,31 +11,7 @@ import 'preparation_screen.dart';
 import 'providers.dart';
 import 'widgets/weather_card_widget.dart';
 import 'widgets/daily_note_card_widget.dart';
-import 'staff_low_stock_screen.dart'; // <-- NEW IMPORT
-
-// This new provider specifically fetches stock requisitions from both today and tomorrow
-// to ensure the kitchen staff sees all open requests from the Butcher.
-final allOpenRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) async* {
-  final firestore = ref.watch(firestoreProvider);
-  final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
-  final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
-
-  final todayReqsStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
-  final tomorrowReqsStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
-
-  await for (var todaySnapshot in todayReqsStream) {
-    final tomorrowSnapshot = await tomorrowReqsStream.first;
-    final combinedDocs = [...todaySnapshot.docs, ...tomorrowSnapshot.docs];
-    combinedDocs.sort((a, b) {
-      final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-      final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-      if (aTime == null || bTime == null) return 0;
-      return aTime.compareTo(bTime);
-    });
-    yield combinedDocs;
-  }
-});
-
+import 'staff_low_stock_screen.dart';
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
   final String? userRole;
