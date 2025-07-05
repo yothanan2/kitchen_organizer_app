@@ -1,11 +1,12 @@
 // lib/butcher_dashboard_screen.dart
-// FINAL: Adds a logout icon to the AppBar.
+// FINAL: Adds a "Requisition History" card to the dashboard.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <-- Import FirebaseAuth
+import 'package:firebase_auth/firebase_auth.dart';
 import 'butcher_requisition_screen.dart';
 import 'butcher_confirmation_screen.dart';
+import 'screens/butcher/butcher_requisition_history_screen.dart'; // <-- IMPORT the new screen
 import 'providers.dart';
 import 'widgets/weather_card_widget.dart';
 import 'widgets/daily_note_card_widget.dart';
@@ -64,7 +65,6 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text("Butcher Dashboard"),
-        // --- THIS IS THE NEW LOGOUT BUTTON ---
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -72,7 +72,6 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
             tooltip: 'Logout',
           ),
         ],
-        // --- END OF NEW BUTTON ---
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -90,9 +89,11 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
             const SizedBox(height: 16),
             const DailyNoteCard(noteFieldName: 'forButcherStaff'),
             const SizedBox(height: 16),
+            // --- THIS IS THE UPDATED LAYOUT SECTION ---
             LayoutBuilder(
               builder: (context, constraints) {
-                if (constraints.maxWidth < 450) {
+                // For smaller screens, we stack all cards vertically
+                if (constraints.maxWidth < 600) {
                   return Column(
                     children: [
                       _buildDashboardCard(
@@ -105,29 +106,55 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
                       ),
                       const SizedBox(height: 16),
                       _buildAnimatedCard(preparedCountAsync),
+                      const SizedBox(height: 16), // Spacing
+                      // --- NEW HISTORY CARD ---
+                      _buildDashboardCard(
+                        context: context,
+                        icon: Icons.history,
+                        title: 'Requisition History',
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => const ButcherRequisitionHistoryScreen(),
+                        )),
+                      ),
                     ],
                   );
                 } else {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // For wider screens, we use a row-based layout
+                  return Column(
                     children: [
-                      Expanded(
-                        child: _buildDashboardCard(
-                          context: context,
-                          icon: Icons.add_shopping_cart,
-                          title: 'Create New Requisition',
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (context) => const ButcherRequisitionScreen(),
-                          )),
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildDashboardCard(
+                              context: context,
+                              icon: Icons.add_shopping_cart,
+                              title: 'Create New Requisition',
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                                builder: (context) => const ButcherRequisitionScreen(),
+                              )),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildAnimatedCard(preparedCountAsync)),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildAnimatedCard(preparedCountAsync)),
+                      const SizedBox(height: 16),
+                      // --- NEW HISTORY CARD (Full Width) ---
+                      _buildDashboardCard(
+                        context: context,
+                        icon: Icons.history,
+                        title: 'Requisition History',
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => const ButcherRequisitionHistoryScreen(),
+                        )),
+                      ),
                     ],
                   );
                 }
               },
             ),
+            // --- END OF UPDATED LAYOUT SECTION ---
           ],
         ),
       ),
