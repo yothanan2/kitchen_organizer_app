@@ -1,18 +1,17 @@
 // lib/staff_home_screen.dart
-// FINAL CORRECTED VERSION: This version uses a robust method to fetch and
-// display requisitions for today and tomorrow, independent of the date picker.
+// FINAL: Adds a metric card for the new requisition system.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:rxdart/rxdart.dart';
 
 import 'preparation_screen.dart';
 import 'providers.dart';
 import 'widgets/weather_card_widget.dart';
 import 'widgets/daily_note_card_widget.dart';
 import 'staff_low_stock_screen.dart';
+import 'kitchen_requisition_screen.dart'; // <-- Import the new screen
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
   const StaffHomeScreen({super.key});
@@ -82,44 +81,17 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     }
   }
 
-  // --- THIS IS THE NEW, ROBUST WAY TO GET THE REQUISITIONS ---
-  Stream<List<DocumentSnapshot>> _getOpenRequisitions() {
-    final firestore = ref.read(firestoreProvider);
-    final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final tomorrowString = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
-
-    final todayStream = firestore.collection('dailyTodoLists').doc(todayString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
-    final tomorrowStream = firestore.collection('dailyTodoLists').doc(tomorrowString).collection('stockRequisitions').where('isCompleted', isEqualTo: false).snapshots();
-
-    return Rx.combineLatest2(
-      todayStream,
-      tomorrowStream,
-          (QuerySnapshot today, QuerySnapshot tomorrow) {
-        final combined = [...today.docs, ...tomorrow.docs];
-        // Optional: sort by time if you have a timestamp field
-        combined.sort((a, b) {
-          final aTime = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-          final bTime = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
-          if (aTime == null || bTime == null) return 0;
-          return aTime.compareTo(bTime);
-        });
-        return combined;
-      },
-    );
-  }
-
-
   @override
   Widget build(BuildContext context) {
     final DateTime selectedDate = ref.watch(selectedDateProvider);
     final String selectedDateString = DateFormat('yyyy-MM-dd').format(selectedDate);
 
     final lowStockItemsCount = ref.watch(lowStockItemsCountProvider);
+    final openRequisitionsCount = ref.watch(openRequisitionsCountProvider); // <-- Watch new provider
     final isTodaysListGenerated = ref.watch(todaysListExistsProvider(selectedDateString));
     final showCompleted = ref.watch(showCompletedTasksProvider);
     final prepTasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: false, date: selectedDateString)));
     final completedPrepTasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: true, date: selectedDateString)));
-    final completedStockReqsAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'stockRequisitions', isCompleted: true, date: selectedDateString)));
     final newBarRequestsAsync = ref.watch(newBarRequestsProvider);
     final unitsMapAsync = ref.watch(unitsMapProvider);
 
@@ -133,6 +105,15 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
           const SizedBox(height: 16),
           const DailyNoteCard(noteFieldName: 'forKitchenStaff'),
           const SizedBox(height: 16),
+          // --- NEW METRIC CARD ---
+          _buildMetricCard(
+            context: context,
+            title: 'Open Requisitions',
+            icon: Icons.assignment_turned_in_outlined,
+            asyncValue: openRequisitionsCount,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const KitchenRequisitionScreen())),
+          ),
+          const SizedBox(height: 16),
           _buildMetricCard(
             context: context,
             title: 'Low-Stock Items',
@@ -143,26 +124,8 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
           const SizedBox(height: 16),
           _buildDateSelector(context, selectedDate),
           const SizedBox(height: 16),
-
-          // --- THIS SECTION IS NOW SEPARATE AND ALWAYS SHOWS TODAY/TOMORROW ---
-          StreamBuilder<List<DocumentSnapshot>>(
-            stream: _getOpenRequisitions(),
-            builder: (context, snapshot) {
-              return _buildTasksSection(
-                context,
-                title: 'Open Stock Requisitions (Today & Tomorrow)',
-                tasksAsync: snapshot.hasData
-                    ? AsyncValue.data(snapshot.data!)
-                    : const AsyncValue.loading(),
-                onToggle: _toggleTaskCompletion,
-                isEmptyMessage: 'No open stock requisitions.',
-                isButcherRequisition: true,
-                unitsMapAsync: unitsMapAsync,
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, showCompleted, completedPrepTasksAsync, completedStockReqsAsync, unitsMapAsync, selectedDate),
+          // --- OLD REQUISITION LIST REMOVED ---
+          _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, showCompleted, completedPrepTasksAsync, unitsMapAsync, selectedDate),
         ],
       ),
     );
@@ -283,7 +246,6 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       AsyncValue<QuerySnapshot> prepTasksAsync,
       bool showCompleted,
       AsyncValue<QuerySnapshot> completedPrepTasksAsync,
-      AsyncValue<QuerySnapshot> completedStockReqsAsync,
       AsyncValue<Map<String, String>> unitsMapAsync,
       DateTime selectedDate) {
     return isTodaysListGenerated.when(
@@ -313,7 +275,6 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
 
         final prepTasksAsListOfDocs = prepTasksAsync.whenData((qs) => qs.docs);
         final completedPrepTasksAsListOfDocs = completedPrepTasksAsync.whenData((qs) => qs.docs);
-        final completedStockReqsAsListOfDocs = completedStockReqsAsync.whenData((qs) => qs.docs);
 
         return Column(
           children: [
@@ -329,8 +290,6 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
             if (showCompleted) ...[
               const SizedBox(height: 20),
               _buildTasksSection(context, title: 'Completed Prep Tasks', tasksAsync: completedPrepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed prep tasks for this date.', unitsMapAsync: unitsMapAsync),
-              const SizedBox(height: 20),
-              _buildTasksSection(context, title: 'Completed Stock Requisitions', tasksAsync: completedStockReqsAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed stock requisitions for this date.', isButcherRequisition: true, unitsMapAsync: unitsMapAsync),
             ],
           ],
         );
@@ -342,7 +301,6 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- THIS IS THE FIX ---
         Center(
           child: Text(
             title,
