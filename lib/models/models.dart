@@ -1,7 +1,8 @@
 // lib/models/models.dart
-// V3: Added 'order' field and 'copyWith' method to PrepTask model.
+// V7: Made Requisition model backwards-compatible to handle old data.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart'; // Import for debugPrint
 
 // Helper function to safely convert a dynamic value to a DocumentReference
 DocumentReference? _toDocRef(dynamic value) {
@@ -10,6 +11,87 @@ DocumentReference? _toDocRef(dynamic value) {
   }
   return null;
 }
+
+// --- REQUISITION MODELS ---
+
+class RequisitionItem {
+  final String itemName;
+  final num quantity;
+  final String unit;
+
+  RequisitionItem({
+    required this.itemName,
+    required this.quantity,
+    required this.unit,
+  });
+
+  factory RequisitionItem.fromMap(Map<String, dynamic> map) {
+    return RequisitionItem(
+      itemName: map['itemName'] ?? 'Unknown Item',
+      quantity: map['quantity'] ?? 0,
+      // Reads the 'unit' string field. Fallbacks to empty if not found.
+      unit: map['unit'] as String? ?? '',
+    );
+  }
+}
+
+class Requisition {
+  final String id;
+  final String status;
+  final DateTime createdAt;
+  final String requestedBy;
+  final List<RequisitionItem> items;
+
+  Requisition({
+    required this.id,
+    required this.status,
+    required this.createdAt,
+    required this.requestedBy,
+    required this.items,
+  });
+
+  // --- THIS IS THE FIX ---
+  factory Requisition.fromFirestore(DocumentSnapshot doc) {
+    try {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+      // Defensive check for the items list
+      var itemsList = (data['items'] as List<dynamic>? ?? [])
+          .map((item) => RequisitionItem.fromMap(item as Map<String, dynamic>))
+          .toList();
+
+      // Defensive check for timestamp
+      final createdAtTimestamp = data['createdAt'] as Timestamp?;
+
+      // Defensive check for user name
+      final requestedByName = data['createdBy'] as String?;
+
+      return Requisition(
+        id: doc.id,
+        status: data['status'] ?? 'unknown',
+        // Use a default old date if timestamp is null
+        createdAt: createdAtTimestamp?.toDate() ?? DateTime(1970),
+        // Use a default name if user field is null
+        requestedBy: requestedByName ?? 'Unknown User',
+        items: itemsList,
+      );
+    } catch (e) {
+      // If any error occurs during parsing, print it and return a placeholder.
+      // This prevents the whole list from failing.
+      debugPrint('Error parsing requisition ${doc.id}: $e');
+      return Requisition(
+        id: doc.id,
+        status: 'parsing_error',
+        createdAt: DateTime(1970),
+        requestedBy: 'Error',
+        items: [],
+      );
+    }
+  }
+// --- END OF FIX ---
+}
+
+// --- EXISTING MODELS ---
 
 class InventoryItem {
   final String id;

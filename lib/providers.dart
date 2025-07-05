@@ -1,5 +1,5 @@
 // lib/providers.dart
-// FINAL CORRECTED VERSION: Fixes the typo in the rxdart import statement.
+// FINAL FIX: Corrected the status query in requisitionHistoryProvider to 'received'.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -10,7 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:collection/collection.dart';
-import 'package:rxdart/rxdart.dart'; // Corrected import
+import 'package:rxdart/rxdart.dart';
 import 'models/models.dart';
 
 // ==== Enums ====
@@ -647,6 +647,18 @@ final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
       .snapshots()
       .map((snapshot) => snapshot.docs.length);
 });
+
+// ==== REQUISITION HISTORY PROVIDER (THE FIX) ====
+final requisitionHistoryProvider = StreamProvider.autoDispose<List<Requisition>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('requisitions')
+      .where('status', isEqualTo: 'received') // <-- THE ONLY CHANGE NEEDED
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => Requisition.fromFirestore(doc)).toList());
+});
+// ===============================================
 
 // NEW ENUM for the bell status
 enum RequisitionStatus { none, requested, prepared }

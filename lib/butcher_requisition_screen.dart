@@ -1,5 +1,5 @@
 // lib/butcher_requisition_screen.dart
-// FINAL: Wraps the body in a SafeArea to prevent the button from being obscured.
+// FINAL: Correctly saves the unit name as a string during submission.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 import 'providers.dart';
 
-// --- Local data models to solve the type errors ---
+// --- Local data models ---
 class Unit {
   final String id;
   final String name;
@@ -27,6 +27,7 @@ class RequisitionFormData {
   bool isChecked;
   final TextEditingController quantityController;
   DocumentReference? selectedUnitRef;
+  String? selectedUnitName; // To hold the unit name string
   RequisitionFormData()
       : isChecked = false,
         quantityController = TextEditingController();
@@ -76,6 +77,7 @@ class _ButcherRequisitionScreenState
     }
   }
 
+  // --- THIS IS THE UPDATED SUBMIT FUNCTION ---
   Future<void> _submitRequisition() async {
     setState(() => _isLoading = true);
 
@@ -97,6 +99,8 @@ class _ButcherRequisitionScreenState
             'source': itemData['source'],
             'quantity': num.tryParse(formData.quantityController.text) ?? 0,
             'unitRef': formData.selectedUnitRef!,
+            // --- THE FIX: Also save the unit name directly ---
+            'unit': formData.selectedUnitName,
           });
         }
       }
@@ -134,6 +138,7 @@ class _ButcherRequisitionScreenState
           value.isChecked = false;
           value.quantityController.clear();
           value.selectedUnitRef = null;
+          value.selectedUnitName = null;
         });
         setState(() {});
       }
@@ -149,6 +154,7 @@ class _ButcherRequisitionScreenState
       }
     }
   }
+  // --- END OF UPDATED SUBMIT FUNCTION ---
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +165,6 @@ class _ButcherRequisitionScreenState
           child: Text('Daily Requisition Form'),
         ),
       ),
-      // --- THIS IS THE FIX ---
       body: SafeArea(
         child: Column(
           children: [
@@ -310,7 +315,6 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
                 ),
               ],
             ),
-
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -344,10 +348,11 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
                         }
 
                         final units = snapshot.data!;
-
                         final unitDropdownItems = units.map((unit) {
                           return DropdownMenuItem<DocumentReference>(
-                              value: FirebaseFirestore.instance.collection('units').doc(unit.id),
+                              value: FirebaseFirestore.instance
+                                  .collection('units')
+                                  .doc(unit.id),
                               child: Text(unit.name));
                         }).toList();
 
@@ -359,7 +364,16 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
                           isExpanded: true,
                           items: unitDropdownItems,
                           onChanged: widget.formData.isChecked
-                              ? (value) => setState(() => widget.formData.selectedUnitRef = value)
+                              ? (value) {
+                            setState(() {
+                              widget.formData.selectedUnitRef = value;
+                              // --- THE FIX: Store the name when the ref changes ---
+                              widget.formData.selectedUnitName = units
+                                  .firstWhereOrNull((u) =>
+                              u.id == value?.id)
+                                  ?.name;
+                            });
+                          }
                               : null,
                           decoration: const InputDecoration(
                               isDense: true, border: OutlineInputBorder()),
