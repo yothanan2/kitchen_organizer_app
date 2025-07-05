@@ -1,6 +1,7 @@
 // lib/login_screen.dart
-// MODIFIED: Added a quick-login button for the new Butcher role.
+// FINAL CORRECTED VERSION: Adds the kIsWeb platform check to prevent crashes on mobile.
 
+import 'package:flutter/foundation.dart'; // <-- This import is necessary for the fix
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'registration_screen.dart';
@@ -54,9 +55,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     setState(() { _isLoading = true; });
 
     try {
-      await FirebaseAuth.instance.setPersistence(
-        _rememberMe ? Persistence.LOCAL : Persistence.SESSION,
-      );
+      // --- THIS IS THE ONLY CHANGE ---
+      // This web-only setting is now wrapped in a platform check.
+      if (kIsWeb) {
+        await FirebaseAuth.instance.setPersistence(
+          _rememberMe ? Persistence.LOCAL : Persistence.SESSION,
+        );
+      }
+      // --- END OF CHANGE ---
 
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email.trim(),
@@ -76,9 +82,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An unexpected error occurred: ${e.toString()}'), backgroundColor: Colors.red.shade700),
-        );
+        // This now checks for the specific error on mobile.
+        if (e.toString().contains('setPersistence')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: const Text('Error: Persistence is not supported on this platform.'), backgroundColor: Colors.red.shade700),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('An unexpected error occurred: ${e.toString()}'), backgroundColor: Colors.red.shade700),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() { _isLoading = false; });

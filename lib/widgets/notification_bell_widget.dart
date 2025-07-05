@@ -1,5 +1,5 @@
 // lib/widgets/notification_bell_widget.dart
-// FINAL: Added blinking animation controlled by the hasOpenRequestsProvider.
+// FINAL: Implements the three-stage (Red/Yellow) blinking logic.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,34 +52,44 @@ class _NotificationBellWidgetState extends ConsumerState<NotificationBellWidget>
   @override
   Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(unreadNotificationsProvider);
-    final hasOpenRequests = ref.watch(hasOpenRequestsProvider).value ?? false;
+    // Watch the new status provider
+    final requisitionStatus = ref.watch(openRequisitionStatusProvider).value ?? RequisitionStatus.none;
 
-    // Control the animation based on whether there are open requests.
-    if (hasOpenRequests) {
-      _animationController.repeat(reverse: true);
+    // Control the animation based on the requisition status.
+    if (requisitionStatus == RequisitionStatus.requested || requisitionStatus == RequisitionStatus.prepared) {
+      if (!_animationController.isAnimating) {
+        _animationController.repeat(reverse: true);
+      }
     } else {
       _animationController.stop();
       _animationController.reset();
     }
 
     return notificationsAsync.when(
-      loading: () => _buildIcon(null),
-      error: (err, stack) => _buildIcon(null),
+      loading: () => _buildIcon(null, requisitionStatus),
+      error: (err, stack) => _buildIcon(null, requisitionStatus),
       data: (snapshot) {
         final count = snapshot.docs.length;
-        return _buildIcon(count > 0 ? count : null, hasOpenRequests);
+        return _buildIcon(count > 0 ? count : null, requisitionStatus);
       },
     );
   }
 
-  Widget _buildIcon(int? count, [bool isBlinking = false]) {
+  Widget _buildIcon(int? count, RequisitionStatus status) {
     final defaultColor = Theme.of(context).appBarTheme.iconTheme?.color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black);
 
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
-        // If blinking, alternate between red and the default color. Otherwise, just use the default.
-        final iconColor = isBlinking && _animationController.value > 0.5 ? Colors.red : defaultColor;
+        Color iconColor;
+        if (status == RequisitionStatus.none) {
+          iconColor = defaultColor;
+        } else {
+          // Determine color based on status and animate
+          final targetColor = status == RequisitionStatus.requested ? Colors.red : Colors.amber.shade700;
+          iconColor = Color.lerp(defaultColor, targetColor, _animationController.value)!;
+        }
+
         return Stack(
           children: [
             IconButton(

@@ -1,5 +1,5 @@
 // lib/butcher_requisition_screen.dart
-// FINAL CORRECTED VERSION: Implements the new grouped requisition data model.
+// FINAL: Wraps the body in a SafeArea to prevent the button from being obscured.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -76,7 +76,6 @@ class _ButcherRequisitionScreenState
     }
   }
 
-  // --- THIS IS THE NEW, CORRECTED SUBMISSION LOGIC ---
   Future<void> _submitRequisition() async {
     setState(() => _isLoading = true);
 
@@ -93,7 +92,6 @@ class _ButcherRequisitionScreenState
         if (originalItemDoc != null) {
           final itemData = originalItemDoc.data() as Map<String, dynamic>;
           itemsToSubmit.add({
-            // Store references and values needed for the new model
             'itemRef': originalItemDoc.reference,
             'itemName': itemData['name'],
             'source': itemData['source'],
@@ -115,7 +113,6 @@ class _ButcherRequisitionScreenState
     final firestore = ref.read(firestoreProvider);
     final appUser = ref.read(appUserProvider).value;
 
-    // Create a single requisition document in the new top-level collection.
     final requisitionDoc = firestore.collection('requisitions').doc();
 
     try {
@@ -124,8 +121,8 @@ class _ButcherRequisitionScreenState
         'createdBy': appUser?.fullName ?? 'Butcher',
         'userId': appUser?.uid,
         'requisitionForDate': Timestamp.fromDate(_selectedDate),
-        'status': 'requested', // This is the first state for the blinking bell!
-        'items': itemsToSubmit, // The list of items is saved inside the document.
+        'status': 'requested',
+        'items': itemsToSubmit,
         'department': 'butcher',
       });
 
@@ -133,7 +130,6 @@ class _ButcherRequisitionScreenState
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Requisition submitted successfully!"),
             backgroundColor: Colors.green));
-        // Reset the form after successful submission.
         _formState.forEach((key, value) {
           value.isChecked = false;
           value.quantityController.clear();
@@ -158,46 +154,52 @@ class _ButcherRequisitionScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daily Requisition Form'),
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text('Daily Requisition Form'),
+        ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Card(
-              elevation: 4,
-              child: ListTile(
-                leading: const Icon(Icons.calendar_today),
-                title: const Text("Requisition for Date"),
-                subtitle: Text(DateFormat('EEEE, MMMM d, yyyy').format(_selectedDate),
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(color: Theme.of(context).primaryColor)),
-                onTap: () => _selectDate(context),
+      // --- THIS IS THE FIX ---
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Card(
+                elevation: 4,
+                child: ListTile(
+                  leading: const Icon(Icons.calendar_today),
+                  title: const Text("Requisition for Date"),
+                  subtitle: Text(DateFormat('EEEE, MMMM d, yyyy').format(_selectedDate),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(color: Theme.of(context).primaryColor)),
+                  onTap: () => _selectDate(context),
+                ),
               ),
             ),
-          ),
-          _RequisitionList(formState: _formState),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _submitRequisition,
-              icon: _isLoading
-                  ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child:
-                  CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.send),
-              label: const Text("Submit Requisition to Kitchen"),
-              style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  textStyle: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+            _RequisitionList(formState: _formState),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _submitRequisition,
+                icon: _isLoading
+                    ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child:
+                    CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.send),
+                label: const Text("Submit Requisition to Kitchen"),
+                style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    textStyle: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -275,93 +277,96 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8.0, 8.0, 16.0, 8.0),
-        child: Row(
+        child: Wrap(
+          spacing: 8.0,
+          runSpacing: 12.0,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Checkbox(
-              value: widget.formData.isChecked,
-              onChanged: (value) =>
-                  setState(() => widget.formData.isChecked = value ?? false),
-            ),
-            Expanded(
-                flex: 3,
-                child: RichText(
-                  text: TextSpan(
-                    style: DefaultTextStyle.of(context).style,
-                    children: <TextSpan>[
-                      TextSpan(
-                          text: itemName, style: const TextStyle(fontSize: 16)),
-                      if (source != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Checkbox(
+                  value: widget.formData.isChecked,
+                  onChanged: (value) =>
+                      setState(() => widget.formData.isChecked = value ?? false),
+                ),
+                Flexible(
+                  child: RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(context).style,
+                      children: <TextSpan>[
                         TextSpan(
-                            text: ' ($source)',
-                            style: const TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey)),
+                            text: itemName, style: const TextStyle(fontSize: 16)),
+                        if (source != null)
+                          TextSpan(
+                              text: ' ($source)',
+                              style: const TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: TextFormField(
+                    controller: widget.formData.quantityController,
+                    enabled: widget.formData.isChecked,
+                    decoration: const InputDecoration(
+                        labelText: 'Amount',
+                        isDense: true,
+                        border: OutlineInputBorder()),
+                    keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                     ],
                   ),
-                )),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: widget.formData.quantityController,
-                enabled: widget.formData.isChecked,
-                decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    isDense: true,
-                    border: OutlineInputBorder()),
-                keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: FutureBuilder<List<Unit>>(
-                  future: _fetchUnits(allowedUnitRefs),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                          child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              )));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Text("No Units");
-                    }
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 120,
+                  child: FutureBuilder<List<Unit>>(
+                      future: _fetchUnits(allowedUnitRefs),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2,)));
+                        }
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return const Text("No Units");
+                        }
 
-                    final units = snapshot.data!;
+                        final units = snapshot.data!;
 
-                    final unitDropdownItems = units.map((unit) {
-                      return DropdownMenuItem<DocumentReference>(
-                          value: FirebaseFirestore.instance
-                              .collection('units')
-                              .doc(unit.id),
-                          child: Text(unit.name));
-                    }).toList();
+                        final unitDropdownItems = units.map((unit) {
+                          return DropdownMenuItem<DocumentReference>(
+                              value: FirebaseFirestore.instance.collection('units').doc(unit.id),
+                              child: Text(unit.name));
+                        }).toList();
 
-                    final currentUnitId = widget.formData.selectedUnitRef;
+                        final valueExists = unitDropdownItems.any((item) => item.value?.id == widget.formData.selectedUnitRef?.id);
 
-                    final valueExists = unitDropdownItems
-                        .any((item) => item.value?.id == currentUnitId?.id);
-
-                    return DropdownButtonFormField<DocumentReference>(
-                      value: valueExists ? currentUnitId : null,
-                      hint: const Text("Unit"),
-                      items: unitDropdownItems,
-                      onChanged: widget.formData.isChecked
-                          ? (value) =>
-                          setState(() => widget.formData.selectedUnitRef = value)
-                          : null,
-                      decoration: const InputDecoration(
-                          isDense: true, border: OutlineInputBorder()),
-                    );
-                  }),
+                        return DropdownButtonFormField<DocumentReference>(
+                          value: valueExists ? widget.formData.selectedUnitRef : null,
+                          hint: const Text("Unit"),
+                          isExpanded: true,
+                          items: unitDropdownItems,
+                          onChanged: widget.formData.isChecked
+                              ? (value) => setState(() => widget.formData.selectedUnitRef = value)
+                              : null,
+                          decoration: const InputDecoration(
+                              isDense: true, border: OutlineInputBorder()),
+                        );
+                      }),
+                ),
+              ],
             ),
           ],
         ),
@@ -369,7 +374,6 @@ class _RequisitionItemTileState extends State<_RequisitionItemTile> {
     );
   }
 
-  // This function now correctly returns a list of Unit objects
   Future<List<Unit>> _fetchUnits(List<DocumentReference> refs) async {
     if (refs.isEmpty) return [];
     final unitFutures = refs.map((ref) => ref.get()).toList();
