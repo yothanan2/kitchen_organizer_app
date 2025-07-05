@@ -588,6 +588,33 @@ final newBarRequestsProvider = StreamProvider.autoDispose<List<DocumentSnapshot>
   return firestore.collection('dailyTodoLists').doc(currentStaffDate).collection('barRequests').where('isCompleted', isEqualTo: false).snapshots().map((snapshot) => snapshot.docs);
 });
 
+// In lib/providers.dart, after the 'openRequisitionsProvider'
+
+// Provider to fetch only requisitions that are ready for pickup.
+final preparedRequisitionsProvider = StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('requisitions')
+      .where('status', isEqualTo: 'prepared')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs);
+});
+
+// In lib/providers.dart
+
+// ... (other providers)
+
+// Provider to count only the 'prepared' requisitions.
+final preparedRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
+  // We watch the .stream of the other provider to get the raw stream,
+  // then we map its length to create a new Stream<int>.
+  final preparedStream = ref.watch(preparedRequisitionsProvider.stream);
+  return preparedStream.map((snapshot) => snapshot.length);
+});
+
+// ... (rest of the file)
+
 final tomorrowsFloorStaffPrepTasksProvider = StreamProvider.autoDispose<Set<String>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final tomorrowFormattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
@@ -621,20 +648,41 @@ final openRequisitionsCountProvider = StreamProvider.autoDispose<int>((ref) {
       .map((snapshot) => snapshot.docs.length);
 });
 
-// Provider for the blinking bell logic, uses the new requisition provider.
-final hasOpenRequestsProvider = StreamProvider.autoDispose<bool>((ref) {
-  final openReqs = ref.watch(openRequisitionsProvider.stream);
-  final barReqs = ref.watch(newBarRequestsProvider.stream);
+// NEW ENUM for the bell status
+enum RequisitionStatus { none, requested, prepared }
+
+// UPDATED PROVIDER for the blinking bell logic
+final openRequisitionStatusProvider = StreamProvider.autoDispose<RequisitionStatus>((ref) {
+  final openReqsStream = ref.watch(openRequisitionsProvider.stream);
+  final barReqsStream = ref.watch(newBarRequestsProvider.stream);
 
   return Rx.combineLatest2(
-    openReqs,
-    barReqs,
-        (List<DocumentSnapshot> butcher, List<DocumentSnapshot> bar) {
-      return butcher.isNotEmpty || bar.isNotEmpty;
+    openReqsStream,
+    barReqsStream,
+        (List<DocumentSnapshot> requisitions, List<DocumentSnapshot> barRequests) {
+      if (barRequests.isNotEmpty) {
+        // If there are any open bar requests, the status is always 'requested'.
+        return RequisitionStatus.requested;
+      }
+
+      if (requisitions.isEmpty) {
+        return RequisitionStatus.none;
+      }
+
+      // If any requisition has the status 'requested', that's our highest priority.
+      if (requisitions.any((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'requested')) {
+        return RequisitionStatus.requested;
+      }
+
+      // Otherwise, if there are any 'prepared' requisitions, that's the status.
+      if (requisitions.any((doc) => (doc.data() as Map<String, dynamic>)['status'] == 'prepared')) {
+        return RequisitionStatus.prepared;
+      }
+
+      return RequisitionStatus.none;
     },
   );
 });
-
 
 // ==== Analytics Providers ====
 @immutable
