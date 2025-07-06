@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchen_organizer_app/screens/admin/admin_home_screen.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/staff_home_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/screens/user/edit_profile_screen.dart';
 
 class KitchenDashboardScreen extends ConsumerWidget {
   const KitchenDashboardScreen({super.key});
@@ -18,13 +19,25 @@ class KitchenDashboardScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    Widget currentScreen;
     if (isViewingAsStaff) {
-      return const StaffHomeScreen();
+      currentScreen = const StaffHomeScreen();
     } else {
-      // The Admin screen still needs a way to toggle back to the staff view.
-      return AdminHomeScreen(
+      currentScreen = AdminHomeScreen(
         onToggleView: () => ref.read(isViewingAsStaffProvider.notifier).state = true,
       );
     }
+
+    return Scaffold(
+      body: currentScreen,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+          );
+        },
+        child: const Icon(Icons.edit),
+      ),
+    );
   }
 }

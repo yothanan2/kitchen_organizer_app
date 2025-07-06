@@ -2,19 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class RegistrationScreen extends StatefulWidget {
-  const RegistrationScreen({super.key});
+class EditProfileScreen extends StatefulWidget {
+  const EditProfileScreen({super.key});
 
   @override
-  State<RegistrationScreen> createState() => _RegistrationScreenState();
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _RegistrationScreenState extends State<RegistrationScreen> {
+class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _phoneNumberController = TextEditingController();
   final TextEditingController _smsCodeController = TextEditingController();
 
@@ -22,8 +20,46 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _smsOptIn = false;
   String? _verificationId;
   bool _codeSent = false;
+  bool _isPhoneNumberChanged = false;
 
-  Future<void> _registerUser() async {
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+          _fullNameController.text = userData['fullName'] ?? '';
+          _usernameController.text = userData['username'] ?? '';
+          _phoneNumberController.text = userData['phoneNumber'] ?? '';
+          _smsOptIn = userData['smsOptIn'] ?? false;
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateUserProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -33,45 +69,54 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
 
     try {
-      // Check for username uniqueness
-      final usernameSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('username', isEqualTo: _usernameController.text.trim().toLowerCase())
-          .limit(1)
-          .get();
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        // Check for username uniqueness if changed
+        if (_usernameController.text.trim().toLowerCase() != (await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get()).data()?['username']) {
+          final usernameSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: _usernameController.text.trim().toLowerCase())
+              .limit(1)
+              .get();
 
-      if (usernameSnapshot.docs.isNotEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This username is already taken.'), backgroundColor: Colors.red),
-          );
+          if (usernameSnapshot.docs.isNotEmpty) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('This username is already taken.'), backgroundColor: Colors.red),
+              );
+            }
+            setState(() {
+              _isLoading = false;
+            });
+            return;
+          }
         }
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
 
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+        // Check if phone number changed or SMS opt-in enabled
+        String currentPhoneNumber = (await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get()).data()?['phoneNumber'] ?? '';
+        bool currentSmsOptIn = (await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get()).data()?['smsOptIn'] ?? false;
 
-      User? newUser = userCredential.user;
+        _isPhoneNumberChanged = _phoneNumberController.text.trim() != currentPhoneNumber;
 
-      if (newUser != null) {
-        await newUser.sendEmailVerification();
-
-        // If SMS opt-in is selected, initiate phone verification
-        if (_smsOptIn && _phoneNumberController.text.isNotEmpty) {
+        if ((_isPhoneNumberChanged || (_smsOptIn && !currentSmsOptIn)) && _phoneNumberController.text.isNotEmpty) {
           await FirebaseAuth.instance.verifyPhoneNumber(
             phoneNumber: _phoneNumberController.text.trim(),
             verificationCompleted: (PhoneAuthCredential credential) async {
-              await newUser.linkWithCredential(credential);
+              await currentUser.linkWithCredential(credential);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Phone number automatically verified!'), backgroundColor: Colors.green),
                 );
+              }
+              // Update Firestore immediately if auto-verified
+              await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).update({
+                'fullName': _fullNameController.text.trim(),
+                'username': _usernameController.text.trim().toLowerCase(),
+                'phoneNumber': _phoneNumberController.text.trim(),
+                'smsOptIn': _smsOptIn,
+              });
+              if (mounted) {
+                Navigator.of(context).pop();
               }
             },
             verificationFailed: (FirebaseAuthException e) {
@@ -101,30 +146,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               });
             },
           );
-        }
-
-        // Now, create the user document in Firestore.
-        await FirebaseFirestore.instance.collection('users').doc(newUser.uid).set({
-          'fullName': _fullNameController.text.trim(),
-          'username': _usernameController.text.trim().toLowerCase(), // Store username
-          'email': _emailController.text.trim(),
-          'uid': newUser.uid,
-          'role': 'Staff',
-          'isApproved': false,
-          'phoneNumber': _phoneNumberController.text.trim(), // Store phone number
-          'smsOptIn': _smsOptIn, // Store SMS opt-in preference
-          'createdOn': FieldValue.serverTimestamp(),
-        });
-
-        if (mounted) {
-          Navigator.of(context).pop();
+        } else {
+          // No phone verification needed, just update Firestore
+          await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).update({
+            'fullName': _fullNameController.text.trim(),
+            'username': _usernameController.text.trim().toLowerCase(),
+            'phoneNumber': _phoneNumberController.text.trim(),
+            'smsOptIn': _smsOptIn,
+          });
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
         }
       }
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'An error occurred. Please try again.';
-      if (e.code == 'weak-password') {
-        errorMessage = 'The password provided is too weak.';
-      } else if (e.code == 'email-already-in-use') {
+      if (e.code == 'email-already-in-use') {
         errorMessage = 'An account already exists for that email.';
       }
 
@@ -162,6 +199,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'phoneNumber': _phoneNumberController.text.trim(),
         'smsOptIn': true,
       });
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -181,8 +221,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void dispose() {
     _fullNameController.dispose();
     _usernameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
     _phoneNumberController.dispose();
     _smsCodeController.dispose();
     super.dispose();
@@ -192,7 +230,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Register'),
+        title: const Text('Edit Profile'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -219,30 +257,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter a username';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
                   }
                   return null;
                 },
@@ -293,8 +307,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(
-                  onPressed: _registerUser,
-                  child: const Text('Register'),
+                  onPressed: _updateUserProfile,
+                  child: const Text('Update Profile'),
                 ),
               ],
             ],
