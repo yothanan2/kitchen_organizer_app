@@ -731,3 +731,59 @@ final taskCompletionProvider = FutureProvider.autoDispose.family<List<TaskChampi
   final controller = ref.watch(analyticsControllerProvider);
   return controller.getTaskCompletionStats(startDate: dateRange.start, endDate: dateRange.end);
 });
+
+@immutable
+class ButcherAnalytics {
+  final List<AnalyzedIngredient> topFiveItems;
+  const ButcherAnalytics({required this.topFiveItems});
+}
+
+final butcherAnalyticsProvider = FutureProvider.autoDispose<ButcherAnalytics>((ref) async {
+  final firestore = ref.watch(firestoreProvider);
+  final user = ref.watch(appUserProvider).value;
+
+  if (user == null) {
+    return const ButcherAnalytics(topFiveItems: []);
+  }
+
+  final requisitionsSnapshot = await firestore
+      .collection('requisitions')
+      .where('userId', isEqualTo: user.uid)
+      .where('department', isEqualTo: 'butcher')
+      .get();
+
+  if (requisitionsSnapshot.docs.isEmpty) {
+    return const ButcherAnalytics(topFiveItems: []);
+  }
+
+  final itemCounts = <String, ({num quantity, String unit})>{};
+
+  for (final doc in requisitionsSnapshot.docs) {
+    final data = doc.data();
+    final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
+    for (final item in items) {
+      final itemName = item['itemName'] as String;
+      final quantity = item['quantity'] as num;
+      final unit = item['unit'] as String? ?? 'N/A';
+
+      itemCounts.update(
+        itemName,
+        (value) => (quantity: value.quantity + quantity, unit: value.unit),
+        ifAbsent: () => (quantity: quantity, unit: unit),
+      );
+    }
+  }
+
+  final sortedItems = itemCounts.entries.toList()
+    ..sort((a, b) => b.value.quantity.compareTo(a.value.quantity));
+
+  final topItems = sortedItems.take(5).map((entry) {
+    return AnalyzedIngredient(
+      name: entry.key,
+      totalQuantity: entry.value.quantity,
+      unit: entry.value.unit,
+    );
+  }).toList();
+
+  return ButcherAnalytics(topFiveItems: topItems);
+});

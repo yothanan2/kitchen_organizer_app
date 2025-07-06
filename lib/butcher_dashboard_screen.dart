@@ -1,4 +1,4 @@
-// lib/butcher_dashboard_screen.dart
+"""// lib/butcher_dashboard_screen.dart
 // FINAL: Adds a "Requisition History" card to the dashboard.
 
 import 'package:flutter/material.dart';
@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'butcher_requisition_screen.dart';
 import 'butcher_confirmation_screen.dart';
-import 'screens/butcher/butcher_requisition_history_screen.dart'; // <-- IMPORT the new screen
+import 'screens/butcher/butcher_requisition_history_screen.dart';
+import 'screens/butcher/butcher_in_progress_screen.dart';
 import 'providers.dart';
 import 'widgets/weather_card_widget.dart';
 import 'widgets/daily_note_card_widget.dart';
@@ -89,10 +90,8 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
             const SizedBox(height: 16),
             const DailyNoteCard(noteFieldName: 'forButcherStaff'),
             const SizedBox(height: 16),
-            // --- THIS IS THE UPDATED LAYOUT SECTION ---
             LayoutBuilder(
               builder: (context, constraints) {
-                // For smaller screens, we stack all cards vertically
                 if (constraints.maxWidth < 600) {
                   return Column(
                     children: [
@@ -106,8 +105,16 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
                       ),
                       const SizedBox(height: 16),
                       _buildAnimatedCard(preparedCountAsync),
-                      const SizedBox(height: 16), // Spacing
-                      // --- NEW HISTORY CARD ---
+                      const SizedBox(height: 16),
+                      _buildDashboardCard(
+                        context: context,
+                        icon: Icons.timelapse,
+                        title: 'In-Progress Requisitions',
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => const ButcherInProgressScreen(),
+                        )),
+                      ),
+                      const SizedBox(height: 16),
                       _buildDashboardCard(
                         context: context,
                         icon: Icons.history,
@@ -119,7 +126,6 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
                     ],
                   );
                 } else {
-                  // For wider screens, we use a row-based layout
                   return Column(
                     children: [
                       Row(
@@ -140,21 +146,38 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // --- NEW HISTORY CARD (Full Width) ---
-                      _buildDashboardCard(
-                        context: context,
-                        icon: Icons.history,
-                        title: 'Requisition History',
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) => const ButcherRequisitionHistoryScreen(),
-                        )),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDashboardCard(
+                              context: context,
+                              icon: Icons.timelapse,
+                              title: 'In-Progress Requisitions',
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                                builder: (context) => const ButcherInProgressScreen(),
+                              )),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDashboardCard(
+                              context: context,
+                              icon: Icons.history,
+                              title: 'Requisition History',
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                                builder: (context) => const ButcherRequisitionHistoryScreen(),
+                              )),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   );
                 }
               },
             ),
-            // --- END OF UPDATED LAYOUT SECTION ---
+            const SizedBox(height: 16),
+            _buildAnalyticsCard(ref),
           ],
         ),
       ),
@@ -240,4 +263,49 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
       ),
     );
   }
+
+  Widget _buildAnalyticsCard(WidgetRef ref) {
+    final analyticsAsync = ref.watch(butcherAnalyticsProvider);
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your Top 5 Most Requested Items',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            analyticsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('Error: $err')),
+              data: (analytics) {
+                if (analytics.topFiveItems.isEmpty) {
+                  return const Center(child: Text('No data available yet.'));
+                }
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: analytics.topFiveItems.length,
+                  itemBuilder: (context, index) {
+                    final item = analytics.topFiveItems[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        child: Text('${index + 1}'),
+                      ),
+                      title: Text(item.name),
+                      trailing: Text('${item.totalQuantity} ${item.unit}'),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+""
