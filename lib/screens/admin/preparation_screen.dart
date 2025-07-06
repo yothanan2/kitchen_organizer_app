@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'providers.dart'; // Import necessary providers like preparationControllerProvider, dishesProvider
+import 'package:kitchen_organizer_app/providers.dart'; // Import necessary providers like preparationControllerProvider, dishesProvider
 
 class PreparationScreen extends ConsumerStatefulWidget {
   const PreparationScreen({super.key});

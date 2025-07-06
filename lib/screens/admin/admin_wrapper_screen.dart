@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
-import 'admin_home_screen.dart';
-import 'staff_wrapper_screen.dart';
-import 'floor_staff_dashboard_screen.dart';
-import 'package:kitchen_organizer_app/butcher_dashboard_screen.dart'; // <-- NEW IMPORT
+import 'package:kitchen_organizer_app/screens/admin/admin_home_screen.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/staff_wrapper_screen.dart';
+import 'package:kitchen_organizer_app/screens/floor/floor_staff_dashboard_screen.dart';
+import 'package:kitchen_organizer_app/screens/butcher/butcher_dashboard_screen.dart'; // <-- NEW IMPORT
 
 class AdminWrapperScreen extends ConsumerStatefulWidget {
   const AdminWrapperScreen({super.key});

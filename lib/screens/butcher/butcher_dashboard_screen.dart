@@ -4,13 +4,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'butcher_requisition_screen.dart';
-import 'butcher_confirmation_screen.dart';
-import 'screens/butcher/butcher_requisition_history_screen.dart';
-import 'screens/butcher/butcher_in_progress_screen.dart';
-import 'providers.dart';
-import 'widgets/weather_card_widget.dart';
-import 'widgets/daily_note_card_widget.dart';
+import 'package:kitchen_organizer_app/screens/butcher/butcher_requisition_screen.dart';
+import 'package:kitchen_organizer_app/screens/butcher/butcher_confirmation_screen.dart';
+import 'package:kitchen_organizer_app/screens/butcher/butcher_requisition_history_screen.dart';
+import 'package:kitchen_organizer_app/screens/butcher/butcher_in_progress_screen.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
+import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
 
 class ButcherDashboardScreen extends ConsumerStatefulWidget {
   const ButcherDashboardScreen({super.key});

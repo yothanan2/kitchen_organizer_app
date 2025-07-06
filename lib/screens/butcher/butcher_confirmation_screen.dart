@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'providers.dart';
+import 'package:kitchen_organizer_app/providers.dart';
 
 class ButcherConfirmationScreen extends ConsumerWidget {
   const ButcherConfirmationScreen({super.key});

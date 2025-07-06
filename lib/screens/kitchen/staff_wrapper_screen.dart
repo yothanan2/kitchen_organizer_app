@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'staff_home_screen.dart';
-import 'staff_inventory_count_screen.dart';
-import 'providers.dart';
-import 'home_screen.dart'; // Import to access the view provider
-import 'widgets/notification_bell_widget.dart'; // Import the new bell widget
+import 'package:kitchen_organizer_app/screens/kitchen/staff_home_screen.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/staff_inventory_count_screen.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/kitchen_dashboard_screen.dart';
+import 'package:kitchen_organizer_app/widgets/notification_bell_widget.dart';
 
 class StaffWrapperScreen extends ConsumerWidget {
   const StaffWrapperScreen({super.key});
@@ -57,7 +57,7 @@ class StaffWrapperScreen extends ConsumerWidget {
         body: const TabBarView(
           children: [
             // Page 1: The main staff dashboard
-            StaffHomeScreen(),
+            KitchenDashboardScreen(),
             // Page 2: The inventory counting screen
             StaffInventoryCountScreen(),
           ],

@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'auth_gate.dart';
+import 'package:kitchen_organizer_app/auth_gate.dart';
 
 class FloorStaffThankYouScreen extends ConsumerWidget {
   final String reporterName;

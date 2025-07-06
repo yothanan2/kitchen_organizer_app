@@ -4,12 +4,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../user_management_screen.dart';
-import '../../inventory_overview_screen.dart';
-import '../../shopping_list_screen.dart';
-import '../../floor_checklist_items_screen.dart';
-import '../../providers.dart';
-import '../../analytics_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/user_management_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/inventory_overview_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/shopping_list_screen.dart';
+import 'package:kitchen_organizer_app/screens/floor/floor_checklist_items_screen.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/screens/admin/analytics_screen.dart';
 import 'unified_dishes_screen.dart';
 import 'manage_butcher_list_screen.dart'; // <-- NEW IMPORT
 

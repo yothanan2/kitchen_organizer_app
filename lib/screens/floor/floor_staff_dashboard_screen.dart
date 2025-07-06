@@ -8,10 +8,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 
-import 'providers.dart';
-import 'floor_staff_confirmation_screen.dart';
-import 'widgets/weather_card_widget.dart';
-import 'widgets/daily_note_card_widget.dart'; // <-- NEW IMPORT
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/screens/floor/floor_staff_confirmation_screen.dart';
+import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
+import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
 
 class FloorChecklistItem {
   final String id;

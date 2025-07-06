@@ -3,9 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'providers.dart';
-import 'models/models.dart';
-import 'widgets/firestore_name_widget.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/models/models.dart';
+import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart';
 
 class StaffLowStockScreen extends ConsumerStatefulWidget {
   const StaffLowStockScreen({super.key});

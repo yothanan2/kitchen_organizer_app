@@ -3,8 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../edit_dish_screen.dart';
-import '../../models/models.dart'; // <-- NEW IMPORT
+import 'package:kitchen_organizer_app/screens/admin/edit_dish_screen.dart';
+import 'package:kitchen_organizer_app/models/models.dart'; // <-- NEW IMPORT
 
 class UnifiedDishesScreen extends StatelessWidget {
   const UnifiedDishesScreen({super.key});

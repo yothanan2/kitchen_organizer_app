@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-import 'providers.dart';
-import 'add_inventory_item_screen.dart';
-import 'models/models.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/screens/admin/add_inventory_item_screen.dart';
+import 'package:kitchen_organizer_app/models/models.dart';
 
 // Provider to fetch all inventory items using the central model.
 final allInventoryItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((ref) {

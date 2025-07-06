@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-import 'providers.dart'; // Assuming firebaseAuth and firestoreProvider are here
+import 'package:kitchen_organizer_app/providers.dart'; // Assuming firebaseAuth and firestoreProvider are here
 
 // Provider for the currently selected date for prep list history
 final selectedPrepListDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
