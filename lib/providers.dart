@@ -11,7 +11,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:collection/collection.dart';
 import 'package:rxdart/rxdart.dart';
-import 'models/models.dart';
+import 'package:kitchen_organizer_app/models/models.dart';
 
 // ==== Enums ====
 enum NoteAudience { floor, kitchen, butcher, both }
@@ -579,6 +579,8 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
 });
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
 final showCompletedTasksProvider = StateProvider<bool>((ref) => false);
+
+final isViewingAsStaffProvider = StateProvider<bool>((ref) => false);
 
 
 // ==== Notification and Request Providers ====

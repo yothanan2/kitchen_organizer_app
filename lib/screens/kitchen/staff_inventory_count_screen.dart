@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'providers.dart';
-import 'models/models.dart';
-import 'add_inventory_item_screen.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/models/models.dart';
+import 'package:kitchen_organizer_app/screens/admin/add_inventory_item_screen.dart';
 
 // A helper widget for displaying unit names efficiently.
 class UnitNameWidget extends ConsumerWidget {
@@ -133,7 +133,7 @@ class _StaffInventoryCountScreenState extends ConsumerState<StaffInventoryCountS
 
   @override
   Widget build(BuildContext context) {
-    final inventoryGroupsAsync = ref.watch(inventoryGroupsProvider);
+        final inventoryGroupsAsync = ref.watch(inventoryGroupsProvider);
 
     return inventoryGroupsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),

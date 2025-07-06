@@ -6,12 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'providers.dart';
-import 'user_management_screen.dart';
-import 'analytics_screen.dart';
-import 'screens/admin/system_management_screen.dart';
-import 'screens/admin/daily_notes_history_screen.dart'; // <-- NEW IMPORT
-import 'widgets/weather_card_widget.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/screens/admin/user_management_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/analytics_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/system_management_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/daily_notes_history_screen.dart'; // <-- NEW IMPORT
+import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
 
 class AdminHomeScreen extends ConsumerWidget {
   final VoidCallback? onToggleView;

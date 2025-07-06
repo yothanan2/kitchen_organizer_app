@@ -4,13 +4,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'add_inventory_item_screen.dart';
-import 'units_screen.dart';
-import 'suppliers_screen.dart';
-import 'locations_screen.dart';
-import 'categories_screen.dart';
-import 'providers.dart';
-import 'widgets/firestore_name_widget.dart'; // <-- IMPORT a single source of truth
+import 'package:kitchen_organizer_app/screens/admin/add_inventory_item_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/units_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/suppliers_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/locations_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/categories_screen.dart';
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart'; // <-- IMPORT a single source of truth
 
 class InventoryOverviewScreen extends ConsumerWidget {
   const InventoryOverviewScreen({super.key});

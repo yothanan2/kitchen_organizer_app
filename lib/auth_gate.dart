@@ -7,12 +7,12 @@ import 'dart:developer' as developer;
 
 import 'login_screen.dart';
 import 'verify_email_screen.dart';
-import 'pending_approval_screen.dart';
-import 'home_screen.dart';
-import 'floor_staff_dashboard_screen.dart';
-import 'butcher_dashboard_screen.dart';
-import 'admin_wrapper_screen.dart';
-import 'staff_wrapper_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/pending_approval_screen.dart';
+
+import 'package:kitchen_organizer_app/screens/floor/floor_staff_dashboard_screen.dart';
+import 'package:kitchen_organizer_app/screens/butcher/butcher_dashboard_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/admin_wrapper_screen.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/staff_wrapper_screen.dart';
 
 import 'providers.dart';
 

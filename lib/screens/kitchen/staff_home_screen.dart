@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-import 'preparation_screen.dart';
-import 'providers.dart';
-import 'widgets/weather_card_widget.dart';
-import 'widgets/daily_note_card_widget.dart';
-import 'staff_low_stock_screen.dart';
-import 'kitchen_requisition_screen.dart'; // <-- Import the new screen
+import 'package:kitchen_organizer_app/screens/admin/preparation_screen.dart';
+
+import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
+import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/staff_low_stock_screen.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart';
+
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
   const StaffHomeScreen({super.key});

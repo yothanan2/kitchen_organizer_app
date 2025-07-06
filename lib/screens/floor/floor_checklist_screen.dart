@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'providers.dart';
+import 'package:kitchen_organizer_app/providers.dart';
 
 class FloorChecklistScreen extends ConsumerWidget {
   const FloorChecklistScreen({super.key});

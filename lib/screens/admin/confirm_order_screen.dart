@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:intl/intl.dart';
-import 'widgets/firestore_name_widget.dart'; // <-- CORRECTED IMPORT
+import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart'; // <-- CORRECTED IMPORT
 
 class ConfirmOrderScreen extends StatefulWidget {
   final String supplierId;

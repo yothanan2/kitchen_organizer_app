@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'inventory_overview_screen.dart';
-import 'providers.dart'; // Import our central providers file
+import 'package:kitchen_organizer_app/screens/admin/inventory_overview_screen.dart';
+import 'package:kitchen_organizer_app/providers.dart'; // Import our central providers file
 
 // The screen is now a stateless ConsumerWidget.
 class ChooseSupplierScreen extends ConsumerWidget {

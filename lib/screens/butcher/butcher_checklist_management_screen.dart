@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart'; // For more collection utilities
-import 'providers.dart'; // Assuming this contains firestoreProvider and other necessary providers
+import 'package:kitchen_organizer_app/providers.dart'; // Assuming this contains firestoreProvider and other necessary providers
 
 // Define RequisitionFormData here, as it's specific to this screen
 class RequisitionFormData {
