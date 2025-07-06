@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 import 'providers.dart';
+import 'models/models.dart';
 
 // --- Local data models ---
 class Unit {
@@ -45,7 +46,8 @@ StreamProvider.autoDispose<List<QueryDocumentSnapshot>>((ref) {
 });
 
 class ButcherRequisitionScreen extends ConsumerStatefulWidget {
-  const ButcherRequisitionScreen({super.key});
+  final List<RequisitionItem>? reorderItems;
+  const ButcherRequisitionScreen({super.key, this.reorderItems});
 
   @override
   ConsumerState<ButcherRequisitionScreen> createState() =>
@@ -57,6 +59,35 @@ class _ButcherRequisitionScreenState
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   bool _isLoading = false;
   final Map<String, RequisitionFormData> _formState = {};
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.reorderItems != null) {
+      _initializeFormWithReorderItems();
+    }
+  }
+
+  void _initializeFormWithReorderItems() {
+    final allRequestableItemsAsync = ref.read(butcherRequestableItemsProvider);
+
+    allRequestableItemsAsync.whenData((items) {
+      for (final reorderItem in widget.reorderItems!) {
+        final matchingItem = items.firstWhereOrNull(
+          (item) => (item.data() as Map<String, dynamic>)['name'] == reorderItem.itemName,
+        );
+
+        if (matchingItem != null) {
+          final docId = matchingItem.id;
+          _formState[docId] = RequisitionFormData()
+            ..isChecked = true
+            ..quantityController.text = reorderItem.quantity.toString()
+            ..selectedUnitName = reorderItem.unit;
+        }
+      }
+      setState(() {});
+    });
+  }
 
   @override
   void dispose() {
