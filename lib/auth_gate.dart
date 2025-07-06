@@ -10,7 +10,7 @@ import 'verify_email_screen.dart';
 import 'pending_approval_screen.dart';
 import 'home_screen.dart';
 import 'floor_staff_dashboard_screen.dart';
-import 'butcher_dashboard_screen.dart';
+import 'screens/butcher/butcher_dashboard_screen.dart';
 import 'admin_wrapper_screen.dart';
 import 'staff_wrapper_screen.dart';
 

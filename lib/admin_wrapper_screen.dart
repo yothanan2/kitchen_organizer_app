@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'admin_home_screen.dart';
 import 'staff_wrapper_screen.dart';
 import 'floor_staff_dashboard_screen.dart';
-import 'butcher_dashboard_screen.dart'; // <-- NEW IMPORT
+import 'package:kitchen_organizer_app/butcher_dashboard_screen.dart'; // <-- NEW IMPORT
 
 class AdminWrapperScreen extends ConsumerStatefulWidget {
   const AdminWrapperScreen({super.key});
