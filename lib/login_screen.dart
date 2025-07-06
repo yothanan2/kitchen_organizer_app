@@ -4,6 +4,7 @@
 import 'package:flutter/foundation.dart'; // <-- This import is necessary for the fix
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,7 +16,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameEmailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
@@ -40,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameEmailController.dispose();
     _passwordController.dispose();
     _blinkAnimationController.dispose();
     super.dispose();
@@ -48,13 +49,36 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   Future<void> _loginUser() async {
     if (!_formKey.currentState!.validate()) return;
-    await _performSignIn(_emailController.text, _passwordController.text);
+    await _performSignIn(_usernameEmailController.text, _passwordController.text);
   }
 
-  Future<void> _performSignIn(String email, String password) async {
+  Future<void> _performSignIn(String usernameOrEmail, String password) async {
     setState(() { _isLoading = true; });
 
     try {
+      String emailToSignIn = usernameOrEmail.trim();
+
+      // Check if the input is an email or a username
+      if (!emailToSignIn.contains('@')) {
+        // Assume it's a username, query Firestore to get the email
+        final userSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('username', isEqualTo: emailToSignIn.toLowerCase())
+            .limit(1)
+            .get();
+
+        if (userSnapshot.docs.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No user found for that username.'), backgroundColor: Colors.red.shade700),
+            );
+          }
+          setState(() { _isLoading = false; });
+          return;
+        }
+        emailToSignIn = userSnapshot.docs.first.data()['email'];
+      }
+
       // --- THIS IS THE ONLY CHANGE ---
       // This web-only setting is now wrapped in a platform check.
       if (kIsWeb) {
@@ -65,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       // --- END OF CHANGE ---
 
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email.trim(),
+        email: emailToSignIn,
         password: password.trim(),
       );
     } on FirebaseAuthException catch (e) {
@@ -168,11 +192,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                           const SizedBox(height: 24),
                           TextFormField(
-                            controller: _emailController,
+                            controller: _usernameEmailController,
                             decoration: InputDecoration(
-                              labelText: 'Email',
-                              hintText: 'Enter your email',
-                              prefixIcon: Icon(Icons.email_outlined, color: Theme.of(context).primaryColor),
+                              labelText: 'Email or Username',
+                              hintText: 'Enter your email or username',
+                              prefixIcon: Icon(Icons.person_outline, color: Theme.of(context).primaryColor),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -181,10 +205,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
                               ),
                             ),
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: TextInputType.text,
                             validator: (value) {
-                              if (value == null || value.trim().isEmpty) return 'Please enter your email';
-                              if (!value.contains('@')) return 'Please enter a valid email';
+                              if (value == null || value.trim().isEmpty) return 'Please enter your email or username';
                               return null;
                             },
                           ),

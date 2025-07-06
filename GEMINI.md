@@ -59,3 +59,4 @@ The following are open tasks and ideas for future implementation:
 * We need to work on the low-stock items feature on the kitchen dashboard.
 * Implement SMS notifications, including phone number verification during registration and an opt-in choice for users.
 * When requested items are prepared and ready for pickup, send an SMS notice.
+* **SMS Notification Issue**: The Twilio Firebase Extension is consistently returning a "A 'From' or 'MessagingServiceSid' parameter is required" error (code 21603) despite re-configuring the `TWILIO_PHONE_NUMBER`. This needs further investigation into Twilio account settings or extension reinstallation.
