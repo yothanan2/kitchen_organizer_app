@@ -8,8 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/staff_home_screen.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/staff_inventory_count_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
-import 'package:kitchen_organizer_app/screens/kitchen/kitchen_dashboard_screen.dart';
 import 'package:kitchen_organizer_app/widgets/notification_bell_widget.dart';
+import 'package:kitchen_organizer_app/screens/user/edit_profile_screen.dart';
 
 class StaffWrapperScreen extends ConsumerWidget {
   const StaffWrapperScreen({super.key});
@@ -22,8 +22,16 @@ class StaffWrapperScreen extends ConsumerWidget {
       length: 2, // We have two tabs: Today and Inventory
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Staff Dashboard'),
+          title: const Text('Kitchen Hub'),
           actions: [
+            // Button to reset the date to today
+            IconButton(
+              icon: const Icon(Icons.calendar_today),
+              onPressed: () {
+                ref.read(selectedDateProvider.notifier).state = DateTime.now();
+              },
+              tooltip: 'Go to Today',
+            ),
             // This is the new notification bell.
             const NotificationBellWidget(),
 
@@ -57,10 +65,18 @@ class StaffWrapperScreen extends ConsumerWidget {
         body: const TabBarView(
           children: [
             // Page 1: The main staff dashboard
-            KitchenDashboardScreen(),
+            const StaffHomeScreen(),
             // Page 2: The inventory counting screen
             StaffInventoryCountScreen(),
           ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+            );
+          },
+          child: const Icon(Icons.edit),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/models/models.dart';
 import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StaffLowStockScreen extends ConsumerStatefulWidget {
   const StaffLowStockScreen({super.key});
@@ -115,7 +116,10 @@ class _StaffLowStockScreenState extends ConsumerState<StaffLowStockScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    FirestoreNameWidget(collection: 'units', docId: item.unit?.id),
+                                    FirestoreNameWidget(
+                                      docRef: item.unit != null ? FirebaseFirestore.instance.collection('units').doc(item.unit!.id) : null,
+                                      builder: (context, unitName) => Text(unitName),
+                                    ),
                                   ],
                                 ),
                               ],

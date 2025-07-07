@@ -11,8 +11,8 @@ import 'package:kitchen_organizer_app/screens/admin/preparation_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
 import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart' as kReqScreen;
 import 'package:kitchen_organizer_app/screens/kitchen/staff_low_stock_screen.dart';
-import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart';
 
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
@@ -113,7 +113,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
             title: 'Open Requisitions',
             icon: Icons.assignment_turned_in_outlined,
             asyncValue: openRequisitionsCount,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const KitchenRequisitionScreen())),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const kReqScreen.KitchenRequisitionScreen())),
           ),
           const SizedBox(height: 16),
           _buildMetricCard(

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:kitchen_organizer_app/providers.dart';
+import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart';
 
 class KitchenRequisitionScreen extends ConsumerWidget {
   const KitchenRequisitionScreen({super.key});
@@ -20,7 +21,7 @@ class KitchenRequisitionScreen extends ConsumerWidget {
       ),
       body: openRequisitionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        error: (err, stack) => Center(child: Text('Error: \$err')),
         data: (requisitions) {
           if (requisitions.isEmpty) {
             return const Center(
@@ -88,10 +89,10 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
       child: ExpansionTile(
         leading: Icon(statusIcon, color: Theme.of(context).primaryColor),
         title: Text(
-          'Request from $createdBy for ${DateFormat('EEE, MMM d').format(forDate)}',
+          'Request from \$createdBy for ${DateFormat('EEE, MMM d').format(forDate)}',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('Status: $status'),
+        subtitle: Text('Status: \$status'),
         children: [
           for (int i = 0; i < items.length; i++)
             _buildItemTile(items[i], i),
@@ -113,9 +114,9 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
         subtitle: unitRef != null
             ? FirestoreNameWidget(
           docRef: unitRef,
-          builder: (context, unitName) => Text('$quantity $unitName'),
+          builder: (context, unitName) => Text('\$quantity \$unitName'),
         )
-            : Text('$quantity'),
+            : Text('\$quantity'),
         trailing: Checkbox(
           value: isPrepared,
           onChanged: (value) => _toggleItemPrepared(index, value ?? false),
@@ -125,35 +126,3 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
     );
   }
 }
-
-// Helper widget to resolve DocumentReference names efficiently.
-class FirestoreNameWidget extends ConsumerWidget {
-  final DocumentReference docRef;
-  final Widget Function(BuildContext, String) builder;
-
-  const FirestoreNameWidget({
-    super.key,
-    required this.docRef,
-    required this.builder,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final asyncName = ref.watch(docNameProvider(docRef));
-    return asyncName.when(
-      loading: () => builder(context, '...'),
-      error: (err, stack) => builder(context, 'Error'),
-      data: (name) => builder(context, name),
-    );
-  }
-}
-
-// Provider to get the name from any document reference.
-final docNameProvider = FutureProvider.autoDispose.family<String, DocumentReference>((ref, docRef) async {
-  final doc = await docRef.get();
-  if (doc.exists) {
-    return (doc.data() as Map<String, dynamic>)['name'] ?? 'Unnamed';
-  }
-  return 'Unknown';
-});
-

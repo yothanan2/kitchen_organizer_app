@@ -233,7 +233,13 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             child: ExpansionTile(
               title: Row(
                 children: [
-                  Expanded(child: FirestoreNameWidget(collection: 'suppliers', docId: supplierId, defaultText: 'Unassigned Supplier', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black))),
+                  Expanded(child: FirestoreNameWidget(
+                    docRef: supplierId != 'unassigned' ? FirebaseFirestore.instance.collection('suppliers').doc(supplierId) : null,
+                    builder: (context, name) => Text(
+                      name.isEmpty ? 'Unassigned Supplier' : name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black),
+                    ),
+                  )),
                   IconButton(
                     icon: const Icon(Icons.email_outlined, color: Colors.blue),
                     onPressed: (supplierId == 'unassigned' || items.isEmpty)
@@ -268,7 +274,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       children: [
                         Text(item['quantity'].toString()),
                         const SizedBox(width: 4),
-                        FirestoreNameWidget(collection: 'units', docId: item['unitId']),
+                        FirestoreNameWidget(
+                          docRef: item['unitId'] != null ? FirebaseFirestore.instance.collection('units').doc(item['unitId']) : null,
+                          builder: (context, name) => Text(name),
+                        ),
                       ],
                     ),
                     trailing: Row(

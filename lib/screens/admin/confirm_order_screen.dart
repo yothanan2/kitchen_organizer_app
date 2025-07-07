@@ -136,10 +136,11 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
           children: [
             const Text("ORDER FOR:", style: TextStyle(color: Colors.grey)),
             FirestoreNameWidget(
-              collection: 'suppliers',
-              docId: widget.supplierId,
-              defaultText: "Unassigned Supplier",
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              docRef: FirebaseFirestore.instance.collection('suppliers').doc(widget.supplierId) as DocumentReference<Object?>,
+              builder: (context, name) => Text(
+                name.isEmpty ? "Unassigned Supplier" : name,
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 16),
             const Divider(),
@@ -165,7 +166,10 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                 final item = widget.items[index];
                 final itemNameWidget = item['isCustom'] == true
                     ? Text(item['itemName'], style: const TextStyle(fontSize: 18, fontStyle: FontStyle.italic))
-                    : FirestoreNameWidget(collection: 'inventoryItems', docId: item['inventoryItemId'], fieldName: 'itemName', style: const TextStyle(fontSize: 18));
+                    : FirestoreNameWidget(
+                        docRef: FirebaseFirestore.instance.collection('inventoryItems').doc(item['inventoryItemId']) as DocumentReference<Object?>,
+                        builder: (context, name) => Text(name, style: const TextStyle(fontSize: 18)),
+                      );
 
                 return ListTile(
                   title: itemNameWidget,
@@ -174,7 +178,10 @@ class _ConfirmOrderScreenState extends State<ConfirmOrderScreen> {
                     children: [
                       Text('${item['quantity']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
-                      FirestoreNameWidget(collection: 'units', docId: item['unitId'], style: const TextStyle(fontSize: 18, color: Colors.grey)),
+                      FirestoreNameWidget(
+                        docRef: item['unitId'] != null ? FirebaseFirestore.instance.collection('units').doc(item['unitId']) : null,
+                        builder: (context, name) => Text(name, style: const TextStyle(fontSize: 18, color: Colors.grey)),
+                      ),
                     ],
                   ),
                 );
