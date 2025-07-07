@@ -224,7 +224,10 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                       return ListTile(
                         dense: true,
                         leading: const Icon(Icons.fiber_manual_record, size: 10),
-                        title: FirestoreNameWidget(collection: 'inventoryItems', docId: ingredient.inventoryItemRef.id, fieldName: 'itemName'),
+                        title: FirestoreNameWidget(
+                          docRef: ingredient.inventoryItemRef,
+                          builder: (context, name) => Text(name),
+                        ),
                         trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => controller.removeIngredient(index)),
                       );
                     }),

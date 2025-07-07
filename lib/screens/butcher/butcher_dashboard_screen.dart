@@ -217,18 +217,38 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
   }) {
     return SizedBox(
       height: 180,
+      width: double.infinity,
       child: Card(
         color: cardColor,
         elevation: 4,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (asyncValue != null)
-                  asyncValue.when(
+          child: Stack(
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 48, color: Theme.of(context).primaryColor),
+                      const SizedBox(height: 10),
+                      Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (asyncValue != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: asyncValue.when(
                     loading: () => const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                     error: (err, stack) => const Icon(Icons.error_outline, color: Colors.red, size: 24),
                     data: (count) {
@@ -242,22 +262,11 @@ class _ButcherDashboardScreenState extends ConsumerState<ButcherDashboardScreen>
                           ),
                         );
                       }
-                      return const SizedBox(height: 24);
+                      return const SizedBox.shrink();
                     },
-                  )
-                else
-                  const SizedBox(height: 24),
-                const Spacer(),
-                Icon(icon, size: 48, color: Theme.of(context).primaryColor),
-                const SizedBox(height: 10),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
-                const Spacer(),
-              ],
-            ),
+            ],
           ),
         ),
       ),

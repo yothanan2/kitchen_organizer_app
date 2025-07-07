@@ -298,9 +298,77 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 20),
                 _isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(
-                  onPressed: _verifyPhoneNumberAndLink,
-                  child: const Text('Verify Phone Number'),
+                    : Column(
+                  children: [
+                    ElevatedButton(
+                      onPressed: _verifyPhoneNumberAndLink,
+                      child: const Text('Verify Phone Number'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _codeSent = false;
+                          _isLoading = false;
+                          _smsCodeController.clear();
+                        });
+                      },
+                      child: const Text('Change Phone Number / Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        setState(() { _isLoading = true; });
+                        await FirebaseAuth.instance.verifyPhoneNumber(
+                          phoneNumber: _phoneNumberController.text.trim(),
+                          verificationCompleted: (PhoneAuthCredential credential) async {
+                            await FirebaseAuth.instance.currentUser!.linkWithCredential(credential);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Phone number automatically verified!'), backgroundColor: Colors.green),
+                              );
+                            }
+                            // Update Firestore immediately if auto-verified
+                            await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
+                              'fullName': _fullNameController.text.trim(),
+                              'username': _usernameController.text.trim().toLowerCase(),
+                              'phoneNumber': _phoneNumberController.text.trim(),
+                              'smsOptIn': _smsOptIn,
+                            });
+                            if (mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          verificationFailed: (FirebaseAuthException e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Phone verification failed: ${e.message}'), backgroundColor: Colors.red),
+                              );
+                            }
+                            setState(() {
+                              _isLoading = false;
+                            });
+                          },
+                          codeSent: (String verificationId, int? resendToken) {
+                            setState(() {
+                              _verificationId = verificationId;
+                              _codeSent = true;
+                            });
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('SMS code sent to your phone.'), backgroundColor: Colors.blue),
+                              );
+                            }
+                          },
+                          codeAutoRetrievalTimeout: (String verificationId) {
+                            setState(() {
+                              _verificationId = verificationId;
+                            });
+                          },
+                        );
+                        setState(() { _isLoading = false; });
+                      },
+                      child: const Text('Resend Code'),
+                    ),
+                  ],
                 ),
               ] else ...[
                 const SizedBox(height: 20),

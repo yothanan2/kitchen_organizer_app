@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchen_organizer_app/screens/admin/admin_home_screen.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/staff_home_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
-import 'package:kitchen_organizer_app/screens/user/edit_profile_screen.dart';
 
 class KitchenDashboardScreen extends ConsumerWidget {
   const KitchenDashboardScreen({super.key});
@@ -20,24 +19,23 @@ class KitchenDashboardScreen extends ConsumerWidget {
     }
 
     Widget currentScreen;
-    if (isViewingAsStaff) {
+    if (appUser.role == 'Kitchen Staff') {
       currentScreen = const StaffHomeScreen();
+    } else if (appUser.role == 'Admin') {
+      if (isViewingAsStaff) {
+        currentScreen = const StaffHomeScreen();
+      } else {
+        currentScreen = AdminHomeScreen(
+          onToggleView: () => ref.read(isViewingAsStaffProvider.notifier).state = true,
+        );
+      }
     } else {
-      currentScreen = AdminHomeScreen(
-        onToggleView: () => ref.read(isViewingAsStaffProvider.notifier).state = true,
-      );
+      // Default case or other roles, e.g., redirect to a generic dashboard or error screen
+      currentScreen = const Center(child: Text('Unauthorized access or unknown role.'));
     }
 
     return Scaffold(
       body: currentScreen,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
-          );
-        },
-        child: const Icon(Icons.edit),
-      ),
     );
   }
 }

@@ -162,7 +162,10 @@ class _InventoryFilteredList extends ConsumerWidget {
                             children: [
                               const Icon(Icons.category_outlined, size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
-                              FirestoreNameWidget(collection: 'categories', docId: data['category']),
+                              FirestoreNameWidget(
+                                docRef: data['category'] != null ? FirebaseFirestore.instance.collection('categories').doc(data['category']) : null,
+                                builder: (context, name) => Text(name),
+                              ),
                             ],
                           ),
                         ],
@@ -170,7 +173,10 @@ class _InventoryFilteredList extends ConsumerWidget {
                       trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            FirestoreNameWidget(collection: 'units', docId: data['unit']),
+                            FirestoreNameWidget(
+                              docRef: data['unit'] != null ? FirebaseFirestore.instance.collection('units').doc(data['unit']) : null,
+                              builder: (context, name) => Text(name),
+                            ),
                             const SizedBox(width: 8),
                             Text('${data['quantityOnHand'] ?? 0}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isLowStock ? Colors.red.shade900 : Colors.black)),
                             IconButton(
