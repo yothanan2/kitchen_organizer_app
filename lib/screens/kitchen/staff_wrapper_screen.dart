@@ -1,5 +1,6 @@
 // lib/staff_wrapper_screen.dart
 // V3: Added notification bell and fixed view-switching logic.
+// V4: Temporarily hid TabBar for a more focused view.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,11 +19,13 @@ class StaffWrapperScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appUser = ref.watch(appUserProvider).value;
 
-    return DefaultTabController(
-      length: 2, // We have two tabs: Today and Inventory
-      child: Scaffold(
+    // return DefaultTabController(
+    //   length: 2, // We have two tabs: Today and Inventory
+    //   child: 
+      return Scaffold(
         appBar: AppBar(
-          title: const Text('Kitchen Hub'),
+          backgroundColor: Colors.black,
+          title: const Text('The Pass'),
           actions: [
             // Button to reset the date to today
             IconButton(
@@ -55,30 +58,25 @@ class StaffWrapperScreen extends ConsumerWidget {
               tooltip: 'Logout',
             ),
           ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.today), text: 'Today'),
-              Tab(icon: Icon(Icons.inventory), text: 'Inventory'),
-            ],
-          ),
+          // Hiding the TabBar for now.
+          // bottom: const TabBar(
+          //   tabs: [
+          //     Tab(icon: Icon(Icons.today), text: 'Today'),
+          //     Tab(icon: Icon(Icons.inventory), text: 'Inventory'),
+          //   ],
+          // ),
         ),
-        body: const TabBarView(
-          children: [
-            // Page 1: The main staff dashboard
-            const StaffHomeScreen(),
-            // Page 2: The inventory counting screen
-            StaffInventoryCountScreen(),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const EditProfileScreen()),
-            );
-          },
-          child: const Icon(Icons.edit),
-        ),
-      ),
-    );
+        // Displaying only the StaffHomeScreen instead of the TabBarView
+        body: const StaffHomeScreen(),
+        // body: const TabBarView(
+        //   children: [
+        //     // Page 1: The main staff dashboard
+        //     const StaffHomeScreen(),
+        //     // Page 2: The inventory counting screen
+        //     StaffInventoryCountScreen(),
+        //   ],
+        // ),
+      );
+    // );
   }
 }
