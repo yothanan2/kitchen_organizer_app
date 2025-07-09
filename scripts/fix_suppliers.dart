@@ -9,7 +9,7 @@ void main() async {
   // Using the specific 'web' configuration from your firebase_options.dart
   await Firebase.initializeApp(
     options: const FirebaseOptions(
-      apiKey: "AIzaSyCzdUWU8lgNT7mIbAVfAHd9c8elAilfZr4",
+      apiKey: "YOUR_API_KEY",
       appId: "1:230443187002:web:e9ad540e7ac9906d71ae03",
       messagingSenderId: "230443187002",
       projectId: "unmercato1",
