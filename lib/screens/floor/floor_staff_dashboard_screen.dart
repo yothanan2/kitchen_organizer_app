@@ -235,6 +235,7 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.send_outlined),
             backgroundColor: shouldBlink ? buttonBlinkColorAnimation.value : Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
           );
         },
       ),
