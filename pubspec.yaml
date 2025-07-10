@@ -36,6 +36,7 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.6
   collection: ^1.18.0
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -45,6 +46,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - .env
 
   # Asset declaration for your custom fonts
   fonts:

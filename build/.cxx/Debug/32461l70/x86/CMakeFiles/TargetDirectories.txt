@@ -1,0 +1,2 @@
+C:/android/kitchen_organizer_app/build/.cxx/Debug/32461l70/x86/CMakeFiles/edit_cache.dir
+C:/android/kitchen_organizer_app/build/.cxx/Debug/32461l70/x86/CMakeFiles/rebuild_cache.dir

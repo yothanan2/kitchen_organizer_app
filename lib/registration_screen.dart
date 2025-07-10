@@ -12,16 +12,10 @@ class RegistrationScreen extends StatefulWidget {
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _phoneNumberController = TextEditingController();
-  final TextEditingController _smsCodeController = TextEditingController();
 
   bool _isLoading = false;
-  bool _smsOptIn = false;
-  String? _verificationId;
-  bool _codeSent = false;
 
   Future<void> _registerUser() async {
     if (!_formKey.currentState!.validate()) {
@@ -33,25 +27,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
 
     try {
-      // Check for username uniqueness
-      final usernameSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('username', isEqualTo: _usernameController.text.trim().toLowerCase())
-          .limit(1)
-          .get();
-
-      if (usernameSnapshot.docs.isNotEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This username is already taken.'), backgroundColor: Colors.red),
-          );
-        }
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -60,62 +35,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       User? newUser = userCredential.user;
 
       if (newUser != null) {
+        // This is the new part: send the verification email.
         await newUser.sendEmailVerification();
 
-        // If SMS opt-in is selected, initiate phone verification
-        if (_smsOptIn && _phoneNumberController.text.isNotEmpty) {
-          await FirebaseAuth.instance.verifyPhoneNumber(
-            phoneNumber: _phoneNumberController.text.trim(),
-            verificationCompleted: (PhoneAuthCredential credential) async {
-              await newUser.linkWithCredential(credential);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Phone number automatically verified!'), backgroundColor: Colors.green),
-                );
-              }
-            },
-            verificationFailed: (FirebaseAuthException e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Phone verification failed: ${e.message}'), backgroundColor: Colors.red),
-                );
-              }
-              setState(() {
-                _isLoading = false;
-              });
-            },
-            codeSent: (String verificationId, int? resendToken) {
-              setState(() {
-                _verificationId = verificationId;
-                _codeSent = true;
-              });
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('SMS code sent to your phone.'), backgroundColor: Colors.blue),
-                );
-              }
-            },
-            codeAutoRetrievalTimeout: (String verificationId) {
-              setState(() {
-                _verificationId = verificationId;
-              });
-            },
-          );
-        }
-
         // Now, create the user document in Firestore.
+        // We will add the 'isApproved' field here for the next step.
         await FirebaseFirestore.instance.collection('users').doc(newUser.uid).set({
           'fullName': _fullNameController.text.trim(),
-          'username': _usernameController.text.trim().toLowerCase(), // Store username
           'email': _emailController.text.trim(),
           'uid': newUser.uid,
           'role': 'Staff',
-          'isApproved': false,
-          'phoneNumber': _phoneNumberController.text.trim(), // Store phone number
-          'smsOptIn': _smsOptIn, // Store SMS opt-in preference
+          'isApproved': false, // Add this for Part 2: Admin Approval
           'createdOn': FieldValue.serverTimestamp(),
         });
 
+        // After registering, pop this screen so the user lands back on the
+        // login screen, where the AuthGate will redirect them to the verify screen.
         if (mounted) {
           Navigator.of(context).pop();
         }
@@ -142,49 +77,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
-  Future<void> _verifyPhoneNumberAndLink() async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: _smsCodeController.text.trim(),
-      );
-      await FirebaseAuth.instance.currentUser!.linkWithCredential(credential);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Phone number verified and linked!'), backgroundColor: Colors.green),
-        );
-      }
-      // Update Firestore with verified phone number and smsOptIn status
-      await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
-        'phoneNumber': _phoneNumberController.text.trim(),
-        'smsOptIn': true,
-      });
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to verify phone number: ${e.message}'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   @override
   void dispose() {
     _fullNameController.dispose();
-    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _phoneNumberController.dispose();
-    _smsCodeController.dispose();
     super.dispose();
   }
 
@@ -214,17 +111,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 12),
               TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: 'Username'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a username';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
@@ -247,56 +133,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phoneNumberController,
-                decoration: const InputDecoration(labelText: 'Phone Number (e.g., +11234567890)'),
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (_smsOptIn && (value == null || value.trim().isEmpty)) {
-                    return 'Please enter your phone number to receive SMS notifications';
-                  }
-                  return null;
-                },
+              const SizedBox(height: 20),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                onPressed: _registerUser,
+                child: const Text('Register'),
               ),
-              CheckboxListTile(
-                title: const Text('Receive daily progression via SMS'),
-                value: _smsOptIn,
-                onChanged: (bool? value) {
-                  setState(() {
-                    _smsOptIn = value ?? false;
-                  });
-                },
-              ),
-              if (_codeSent) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _smsCodeController,
-                  decoration: const InputDecoration(labelText: 'SMS Verification Code'),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the SMS code';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(
-                  onPressed: _verifyPhoneNumberAndLink,
-                  child: const Text('Verify Phone Number'),
-                ),
-              ] else ...[
-                const SizedBox(height: 20),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(
-                  onPressed: _registerUser,
-                  child: const Text('Register'),
-                ),
-              ],
             ],
           ),
         ),
