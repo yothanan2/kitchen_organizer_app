@@ -43,7 +43,7 @@ class AuthGate extends ConsumerWidget {
             if (appUser == null) {
               return const LoginScreen();
             }
-            if (!appUser.isEmailVerified) {
+            if (!appUser.isEmailVerified && appUser.role != 'Butcher') {
               return const VerifyEmailScreen();
             }
             if (!appUser.isApproved) {
