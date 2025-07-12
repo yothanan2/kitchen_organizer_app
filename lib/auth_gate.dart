@@ -1,74 +1,71 @@
 // lib/auth_gate.dart
-// MODIFIED: Added logic to bypass email verification for known development accounts.
+// FINAL: Corrects all import paths to reflect the project's file structure.
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:developer' as developer;
-
-import 'login_screen.dart';
-import 'verify_email_screen.dart';
-import 'package:kitchen_organizer_app/screens/admin/pending_approval_screen.dart';
-
-import 'package:kitchen_organizer_app/screens/floor/floor_staff_dashboard_screen.dart';
-import 'package:kitchen_organizer_app/screens/butcher/butcher_dashboard_screen.dart';
-import 'package:kitchen_organizer_app/screens/admin/admin_wrapper_screen.dart';
-import 'package:kitchen_organizer_app/screens/kitchen/staff_wrapper_screen.dart';
-
 import 'providers.dart';
+
+// --- CORRECTED IMPORTS ---
+import 'login_screen.dart';
+import 'screens/admin/pending_approval_screen.dart';
+import 'verify_email_screen.dart';
+import 'screens/admin/admin_wrapper_screen.dart';
+import 'screens/kitchen/staff_wrapper_screen.dart';
+import 'screens/butcher/butcher_dashboard_screen.dart';
+import 'screens/floor/floor_staff_dashboard_screen.dart';
+// --- END OF CORRECTIONS ---
+
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
-  // --- NEW: A list of developer emails to bypass verification ---
-  static const List<String> _devEmails = [
-    'yothanan@gmail.com',
-    'yothanan.rov@gmail.com',
-    'yothanan2@gmail.com',
-    'butcher@test.com',
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final appUserAsync = ref.watch(appUserProvider);
+    final authState = ref.watch(firebaseAuthProvider).authStateChanges();
 
-    return appUserAsync.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) => Scaffold(body: Center(child: Text('An error occurred: $error'))),
-      data: (appUser) {
-        if (appUser == null) {
-          developer.log('AuthGate: User is null, returning LoginScreen.');
+    return StreamBuilder<User?>(
+      stream: authState,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
           return const LoginScreen();
         }
 
-        // --- MODIFIED: The verification check now ignores dev emails ---
-        if (!appUser.isEmailVerified && !_devEmails.contains(appUser.email)) {
-          developer.log('AuthGate: User email not verified, returning VerifyEmailScreen.');
-          return const VerifyEmailScreen();
-        }
+        final user = snapshot.data!;
+        final appUserAsync = ref.watch(appUserProvider);
 
-        if (!appUser.isApproved) {
-          developer.log('AuthGate: User not approved, returning PendingApprovalScreen.');
-          return const PendingApprovalScreen();
-        }
+        // Notifications are now handled by the NotificationBellWidget.
 
-        developer.log('AuthGate: User role is "${appUser.role}".');
-        switch (appUser.role) {
-          case 'Admin':
-            developer.log('AuthGate: User is Admin, returning AdminWrapperScreen.');
-            return const AdminWrapperScreen();
-          case 'Floor Staff':
-            developer.log('AuthGate: User is Floor Staff, returning FloorStaffDashboardScreen.');
-            return const FloorStaffDashboardScreen();
-          case 'Butcher':
-            developer.log('AuthGate: User is Butcher, returning ButcherDashboardScreen.');
-            return const ButcherDashboardScreen();
-          case 'Kitchen Staff':
-            developer.log('AuthGate: User is Kitchen Staff, returning StaffWrapperScreen.');
-            return const StaffWrapperScreen();
-          default:
-            developer.log('AuthGate: User is Staff (default), returning StaffWrapperScreen.');
-            return const StaffWrapperScreen();
-        }
+        return appUserAsync.when(
+          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (err, stack) => Scaffold(body: Center(child: Text('Error loading user data: $err'))),
+          data: (appUser) {
+            if (appUser == null) {
+              return const LoginScreen();
+            }
+            if (!appUser.isEmailVerified) {
+              return const VerifyEmailScreen();
+            }
+            if (!appUser.isApproved) {
+              return const PendingApprovalScreen();
+            }
+
+            // --- ROUTING LOGIC (No changes needed here) ---
+            switch (appUser.role) {
+              case 'Admin':
+                return const AdminWrapperScreen();
+              case 'Floor Staff':
+                return const FloorStaffDashboardScreen();
+              case 'Butcher':
+                return const ButcherDashboardScreen();
+              case 'Kitchen Staff':
+                return const StaffWrapperScreen();
+              default:
+              // Fallback for unassigned roles
+                return const StaffWrapperScreen();
+            }
+          },
+        );
       },
     );
   }
