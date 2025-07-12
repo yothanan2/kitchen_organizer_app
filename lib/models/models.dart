@@ -4,6 +4,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart'; // Import for debugPrint
 
+// Helper function to safely convert a dynamic value to a DocumentReference
+DocumentReference? _toDocRef(dynamic value) {
+  if (value is DocumentReference) {
+    return value;
+  }
+  return null;
+}
+
 // --- REQUISITION MODELS ---
 
 class RequisitionItem {
@@ -119,23 +127,15 @@ class InventoryItem {
       id: id,
       itemName: data['itemName'] ?? '',
       itemCode: data['itemCode'],
-      category: data['category'] is String && (data['category'] as String).isNotEmpty
-          ? FirebaseFirestore.instance.collection('categories').doc(data['category'])
-          : data['category'] as DocumentReference?,
-      supplier: data['supplier'] is String && (data['supplier'] as String).isNotEmpty
-          ? FirebaseFirestore.instance.collection('suppliers').doc(data['supplier'])
-          : data['supplier'] as DocumentReference?,
-      unit: data['unit'] is String && (data['unit'] as String).isNotEmpty
-          ? FirebaseFirestore.instance.collection('units').doc(data['unit'])
-          : data['unit'] as DocumentReference?,
+      category: _toDocRef(data['category']),
+      supplier: _toDocRef(data['supplier']),
+      unit: _toDocRef(data['unit']),
       parLevel: data['parLevel'] ?? 0,
       quantityOnHand: data['quantityOnHand'] ?? 0,
       minStockLevel: data['minStockLevel'] ?? 0,
       lastUpdated: (data['lastUpdated'] as Timestamp?)?.toDate(),
       isButcherItem: data['isButcherItem'] ?? false,
-      location: data['location'] is String && (data['location'] as String).isNotEmpty
-          ? FirebaseFirestore.instance.collection('locations').doc(data['location'])
-          : data['location'] as DocumentReference?,
+      location: _toDocRef(data['location']),
     );
   }
 }
