@@ -163,7 +163,11 @@ class _InventoryFilteredList extends ConsumerWidget {
                               const Icon(Icons.category_outlined, size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
                               FirestoreNameWidget(
-                                docRef: data['category'] != null ? FirebaseFirestore.instance.collection('categories').doc(data['category']) : null,
+                                docRef: data['category'] is String && data['category'].isNotEmpty
+                                    ? FirebaseFirestore.instance.collection('categories').doc(data['category'])
+                                    : data['category'] is DocumentReference
+                                        ? data['category'] as DocumentReference
+                                        : null,
                                 builder: (context, name) => Text(name),
                               ),
                             ],
@@ -174,7 +178,11 @@ class _InventoryFilteredList extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             FirestoreNameWidget(
-                              docRef: data['unit'] != null ? FirebaseFirestore.instance.collection('units').doc(data['unit']) : null,
+                              docRef: data['unit'] is String && data['unit'].isNotEmpty
+                                  ? FirebaseFirestore.instance.collection('units').doc(data['unit'])
+                                  : data['unit'] is DocumentReference
+                                      ? data['unit'] as DocumentReference
+                                      : null,
                               builder: (context, name) => Text(name),
                             ),
                             const SizedBox(width: 8),
