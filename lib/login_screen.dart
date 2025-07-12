@@ -269,26 +269,50 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(
-                    onPressed: _isLoading ? null : () => _performSignIn("yothanan@gmail.com", "12345678"),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _emailController.text = "yothanan@gmail.com";
+                            _passwordController.text = "12345678";
+                            _loginUser();
+                          },
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                     child: const Text("Quick Login (Admin)"),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(
-                    onPressed: _isLoading ? null : () => _performSignIn("yothanan.rov@gmail.com", "12345678"),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _emailController.text = "yothanan.rov@gmail.com";
+                            _passwordController.text = "12345678";
+                            _loginUser();
+                          },
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                     child: const Text("Quick Login (Kitchen Staff)"),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(
-                    onPressed: _isLoading ? null : () => _performSignIn("yothanan2@gmail.com", "12345678"),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _emailController.text = "yothanan2@gmail.com";
+                            _passwordController.text = "12345678";
+                            _loginUser();
+                          },
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                     child: const Text("Quick Login (Floor Staff)"),
                   ),
                   const SizedBox(height: 8),
                   // --- NEW: The Butcher quick-login button ---
                   ElevatedButton(
-                    onPressed: _isLoading ? null : () => _performSignIn("butcher@test.com", "password123"),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            _emailController.text = "butcher@test.com";
+                            _passwordController.text = "password123";
+                            _loginUser();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.brown.shade700, // A new color for the butcher
                       foregroundColor: Colors.white,
