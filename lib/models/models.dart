@@ -1,16 +1,11 @@
 // lib/models/models.dart
-// V7: Made Requisition model backwards-compatible to handle old data.
+// V8: Added toFirestore methods and IngredientType enum for controller compatibility.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart'; // Import for debugPrint
 
-// Helper function to safely convert a dynamic value to a DocumentReference
-DocumentReference? _toDocRef(dynamic value) {
-  if (value is DocumentReference) {
-    return value;
-  }
-  return null;
-}
+// --- ENUMS ---
+enum IngredientType { quantified, onHand }
 
 // --- REQUISITION MODELS ---
 
@@ -29,7 +24,6 @@ class RequisitionItem {
     return RequisitionItem(
       itemName: map['itemName'] ?? 'Unknown Item',
       quantity: map['quantity'] ?? 0,
-      // Reads the 'unit' string field. Fallbacks to empty if not found.
       unit: map['unit'] as String? ?? '',
     );
   }
@@ -50,34 +44,23 @@ class Requisition {
     required this.items,
   });
 
-  // --- THIS IS THE FIX ---
   factory Requisition.fromFirestore(DocumentSnapshot doc) {
     try {
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-      // Defensive check for the items list
       var itemsList = (data['items'] as List<dynamic>? ?? [])
           .map((item) => RequisitionItem.fromMap(item as Map<String, dynamic>))
           .toList();
-
-      // Defensive check for timestamp
       final createdAtTimestamp = data['createdAt'] as Timestamp?;
-
-      // Defensive check for user name
       final requestedByName = data['createdBy'] as String?;
 
       return Requisition(
         id: doc.id,
         status: data['status'] ?? 'unknown',
-        // Use a default old date if timestamp is null
         createdAt: createdAtTimestamp?.toDate() ?? DateTime(1970),
-        // Use a default name if user field is null
         requestedBy: requestedByName ?? 'Unknown User',
         items: itemsList,
       );
     } catch (e) {
-      // If any error occurs during parsing, print it and return a placeholder.
-      // This prevents the whole list from failing.
       debugPrint('Error parsing requisition ${doc.id}: $e');
       return Requisition(
         id: doc.id,
@@ -88,7 +71,6 @@ class Requisition {
       );
     }
   }
-// --- END OF FIX ---
 }
 
 // --- EXISTING MODELS ---
@@ -127,15 +109,23 @@ class InventoryItem {
       id: id,
       itemName: data['itemName'] ?? '',
       itemCode: data['itemCode'],
-      category: _toDocRef(data['category']),
-      supplier: _toDocRef(data['supplier']),
-      unit: _toDocRef(data['unit']),
+      category: (data['category'] is String && (data['category'] as String).isNotEmpty)
+          ? FirebaseFirestore.instance.collection('categories').doc(data['category'])
+          : (data['category'] is DocumentReference ? data['category'] as DocumentReference? : null),
+      supplier: (data['supplier'] is String && (data['supplier'] as String).isNotEmpty)
+          ? FirebaseFirestore.instance.collection('suppliers').doc(data['supplier'])
+          : (data['supplier'] is DocumentReference ? data['supplier'] as DocumentReference? : null),
+      unit: (data['unit'] is String && (data['unit'] as String).isNotEmpty)
+          ? FirebaseFirestore.instance.collection('units').doc(data['unit'])
+          : (data['unit'] is DocumentReference ? data['unit'] as DocumentReference? : null),
       parLevel: data['parLevel'] ?? 0,
       quantityOnHand: data['quantityOnHand'] ?? 0,
       minStockLevel: data['minStockLevel'] ?? 0,
       lastUpdated: (data['lastUpdated'] as Timestamp?)?.toDate(),
       isButcherItem: data['isButcherItem'] ?? false,
-      location: _toDocRef(data['location']),
+      location: (data['location'] is String && (data['location'] as String).isNotEmpty)
+          ? FirebaseFirestore.instance.collection('locations').doc(data['location'])
+          : (data['location'] is DocumentReference ? data['location'] as DocumentReference? : null),
     );
   }
 }
@@ -147,6 +137,7 @@ class Dish {
   final String recipeInstructions;
   final bool isActive;
   final bool isComponent;
+  final String notes;
   final DateTime? lastUpdated;
   final List<Ingredient> ingredients;
   final List<PrepTask> prepTasks;
@@ -158,10 +149,23 @@ class Dish {
     required this.recipeInstructions,
     required this.isActive,
     required this.isComponent,
+    this.notes = '',
     this.lastUpdated,
     this.ingredients = const [],
     this.prepTasks = const [],
   });
+
+  factory Dish.empty({bool isComponent = false}) {
+    return Dish(
+      id: '',
+      dishName: '',
+      category: '',
+      recipeInstructions: '',
+      isActive: true,
+      isComponent: isComponent,
+      notes: '',
+    );
+  }
 
   Dish copyWith({
     String? id,
@@ -170,6 +174,7 @@ class Dish {
     String? recipeInstructions,
     bool? isActive,
     bool? isComponent,
+    String? notes,
     DateTime? lastUpdated,
     List<Ingredient>? ingredients,
     List<PrepTask>? prepTasks,
@@ -181,6 +186,7 @@ class Dish {
       recipeInstructions: recipeInstructions ?? this.recipeInstructions,
       isActive: isActive ?? this.isActive,
       isComponent: isComponent ?? this.isComponent,
+      notes: notes ?? this.notes,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       ingredients: ingredients ?? this.ingredients,
       prepTasks: prepTasks ?? this.prepTasks,
@@ -195,23 +201,36 @@ class Dish {
       recipeInstructions: data['recipeInstructions'] ?? '',
       isActive: data['isActive'] ?? true,
       isComponent: data['isComponent'] ?? false,
+      notes: data['notes'] ?? '',
       lastUpdated: (data['lastUpdated'] as Timestamp?)?.toDate(),
     );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'dishName': dishName,
+      'category': category,
+      'recipeInstructions': recipeInstructions,
+      'isActive': isActive,
+      'isComponent': isComponent,
+      'notes': notes,
+      'lastUpdated': FieldValue.serverTimestamp(),
+    };
   }
 }
 
 class Ingredient {
   final String id;
   final DocumentReference inventoryItemRef;
-  final DocumentReference? unitId;
-  final num quantity;
-  final String type;
+  final DocumentReference? unitRef;
+  final num? quantity;
+  final IngredientType type;
 
   Ingredient({
     required this.id,
     required this.inventoryItemRef,
-    this.unitId,
-    required this.quantity,
+    this.unitRef,
+    this.quantity,
     required this.type,
   });
 
@@ -219,10 +238,19 @@ class Ingredient {
     return Ingredient(
       id: id,
       inventoryItemRef: data['inventoryItemRef'],
-      unitId: data['unitId'],
-      quantity: data['quantity'] ?? 0,
-      type: data['type'] ?? 'ingredient',
+      unitRef: data['unitRef'],
+      quantity: data['quantity'],
+      type: (data['type'] == 'onHand') ? IngredientType.onHand : IngredientType.quantified,
     );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'inventoryItemRef': inventoryItemRef,
+      'unitRef': unitRef,
+      'quantity': quantity,
+      'type': type.name,
+    };
   }
 }
 
@@ -230,16 +258,15 @@ class PrepTask {
   final String id;
   final String taskName;
   final DocumentReference? linkedDishRef;
-  final int order; // ADDED this field
+  final int order;
 
   PrepTask({
     required this.id,
     required this.taskName,
     this.linkedDishRef,
-    required this.order, // ADDED to constructor
+    required this.order,
   });
 
-  // ADDED copyWith method
   PrepTask copyWith({
     String? id,
     String? taskName,
@@ -259,7 +286,15 @@ class PrepTask {
       id: id,
       taskName: data['taskName'] ?? 'Unnamed Task',
       linkedDishRef: data['linkedDishRef'],
-      order: data['order'] ?? 0, // ADDED field from Firestore
+      order: data['order'] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'taskName': taskName,
+      'linkedDishRef': linkedDishRef,
+      'order': order,
+    };
   }
 }

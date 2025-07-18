@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchen_organizer_app/providers.dart';
-import 'package:kitchen_organizer_app/models/models.dart';
 import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -27,16 +26,68 @@ class _StaffLowStockScreenState extends ConsumerState<StaffLowStockScreen> {
     super.dispose();
   }
 
-  void _submitOrderRequest() {
-    // In the future, this button will send the requested items to a new
-    // "Items to Order" page or create a task for the admin.
-    // For now, it will just show a confirmation.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Order request submitted! (Functionality to be built)"),
-        backgroundColor: Colors.green,
-      ),
-    );
+  void _submitOrderRequest() async {
+    final currentUser = ref.read(appUserProvider).value;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error: Could not identify user.")),
+      );
+      return;
+    }
+
+    final itemsToOrder = <Map<String, dynamic>>[];
+    _orderQuantityControllers.forEach((itemId, controller) {
+      final quantityText = controller.text.trim();
+      if (quantityText.isNotEmpty) {
+        final double? quantity = double.tryParse(quantityText);
+        final item = ref.read(lowStockItemsProvider).value?.firstWhere((i) => i.id == itemId);
+        if (quantity != null && quantity > 0 && item != null) {
+          itemsToOrder.add({
+            'inventoryItemRef': FirebaseFirestore.instance.collection('inventoryItems').doc(item.id),
+            'itemName': item.itemName,
+            'quantity': quantity,
+            'unit': item.unit?.id,
+          });
+        }
+      }
+    });
+
+    if (itemsToOrder.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a quantity for at least one item.")),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('orderRequests').add({
+        'requestedBy': currentUser.fullName,
+        'requesterId': currentUser.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending', // e.g., pending, ordered, received
+        'items': itemsToOrder,
+      });
+
+      // Clear controllers and show success message
+      for (final controller in _orderQuantityControllers.values) {
+        controller.clear();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Order request successfully submitted!"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to submit order request: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

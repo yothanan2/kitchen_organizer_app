@@ -93,7 +93,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 } else {
                   await _categoriesCollection.doc(categoryDocument.id).update({'name': name});
                 }
-                if (mounted) Navigator.of(context).pop();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
               },
             ),
           ],
@@ -137,7 +138,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               child: const Text('Delete'),
               onPressed: () async {
                 await _categoriesCollection.doc(docId).delete();
-                if (mounted) Navigator.of(context).pop();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
               },
             ),
           ],

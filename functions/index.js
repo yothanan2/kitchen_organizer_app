@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const nodemailer = require('nodemailer');
 admin.initializeApp();
 
 /*
@@ -52,3 +53,49 @@ exports.onRequisitionCreate_createInAppNotification = functions.firestore
         console.error("Error creating notifications in batch:", error);
       }
     });
+
+/**
+ * Callable function to send a purchase order email to a supplier.
+ *
+ * @param {object} data - The data passed to the function.
+ * @param {string} data.recipientEmail - The email address of the supplier.
+ * @param {string} data.subject - The subject of the email.
+ * @param {string} data.body - The HTML body of the email.
+ * @param {functions.https.CallableContext} context - The context of the function call.
+ * @returns {Promise<{success: boolean}>} - A promise that resolves with a success status.
+ */
+exports.sendOrderEmail = functions.https.onCall(async (data, context) => {
+  // TODO: Configure these environment variables in your Firebase project settings.
+  // `firebase functions:config:set gmail.email="your-email@gmail.com" gmail.password="your-app-password"`
+  const gmailEmail = functions.config().gmail.email;
+  const gmailPassword = functions.config().gmail.password;
+
+  if (!gmailEmail || !gmailPassword) {
+    console.error("Gmail credentials are not configured. Please set gmail.email and gmail.password config.");
+    throw new functions.https.HttpsError('internal', 'The email service is not configured.');
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: gmailEmail,
+      pass: gmailPassword,
+    },
+  });
+
+  const mailOptions = {
+    from: `"Your App Name" <${gmailEmail}>`,
+    to: data.recipientEmail,
+    subject: data.subject,
+    html: data.body,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully to:', data.recipientEmail);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to send email.', error);
+  }
+});

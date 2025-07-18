@@ -158,8 +158,10 @@ class _NoteCard extends ConsumerWidget {
             .doc(dateString)
             .set({'dailyNotes': {noteKey: newNote}}, SetOptions(merge: true));
 
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Note updated successfully!'), backgroundColor: Colors.green));
       } catch (e) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating note: $e'), backgroundColor: Colors.red));
       }
     }
@@ -189,8 +191,10 @@ class _NoteCard extends ConsumerWidget {
             .doc(dateString)
             .set({'dailyNotes': {noteKey: FieldValue.delete()}}, SetOptions(merge: true));
 
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Note deleted successfully!'), backgroundColor: Colors.orange));
       } catch (e) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting note: $e'), backgroundColor: Colors.red));
       }
     }

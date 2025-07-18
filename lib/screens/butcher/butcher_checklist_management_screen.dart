@@ -85,6 +85,7 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
 
 
     if (itemsToSubmit.isEmpty) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please check and fill out at least one item."), backgroundColor: Colors.orange));
       setState(() => _isLoading = false);
       return;
@@ -124,7 +125,7 @@ class _ButcherRequisitionScreenState extends ConsumerState<ButcherRequisitionScr
         setState(() {});
       }
     } catch(e) {
-      print('Firestore Batch Commit Error: $e');
+      debugPrint('Firestore Batch Commit Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to submit requisition: $e"), backgroundColor: Colors.red));
       }

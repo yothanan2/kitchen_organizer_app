@@ -74,7 +74,6 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
   @override
   Widget build(BuildContext context) {
     final data = widget.requisitionDoc.data() as Map<String, dynamic>;
-    final createdBy = data['createdBy'] ?? 'Unknown';
     final forDate = (data['requisitionForDate'] as Timestamp).toDate();
     final status = data['status'] ?? 'unknown';
     final items = List<Map<String, dynamic>>.from(data['items']);
@@ -103,12 +102,11 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
 
   Widget _buildItemTile(Map<String, dynamic> item, int index) {
     final itemName = item['itemName'] ?? 'Unnamed Item';
-    final quantity = item['quantity'] ?? 0;
     final unitRef = item['unitRef'] as DocumentReference?;
     final isPrepared = item['isPrepared'] ?? false;
 
     return Container(
-      color: Colors.white.withOpacity(0.7),
+      color: Colors.white.withAlpha(178),
       child: ListTile(
         title: Text(itemName),
         subtitle: unitRef != null

@@ -138,16 +138,15 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> {
                     ? null
                     : () async {
                   final errorMessage = await prepController.generateLists(_selectedDate);
-                  if (mounted) {
-                    if (errorMessage == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Daily lists generated successfully!'), backgroundColor: Colors.green),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-                      );
-                    }
+                  if (!context.mounted) return;
+                  if (errorMessage == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Daily lists generated successfully!'), backgroundColor: Colors.green),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+                    );
                   }
                 },
                 icon: prepState.isLoading ? const CircularProgressIndicator(color: Colors.white) : const Icon(Icons.send),

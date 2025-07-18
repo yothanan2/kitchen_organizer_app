@@ -32,8 +32,8 @@ class _DailyNoteCardState extends ConsumerState<DailyNoteCard> with SingleTicker
     )..repeat(reverse: true);
 
     _glowAnimation = ColorTween(
-      begin: Colors.red.withOpacity(0.7),
-      end: Colors.blue.withOpacity(0.7),
+      begin: Colors.red.withAlpha(178),
+      end: Colors.blue.withAlpha(178),
     ).animate(_animationController);
   }
 

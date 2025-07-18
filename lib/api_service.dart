@@ -1,13 +1,13 @@
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 
 class ApiService {
   final String? apiKey = dotenv.env['API_KEY'];
 
   Future<void> fetchData() async {
     if (apiKey == null) {
-      print('API Key not found in .env file');
+      debugPrint('API Key not found in .env file');
       return;
     }
 

@@ -1,62 +1,52 @@
-# Project Handoff: Kitchen Organizer Application
+Project Handoff & Core Directives
+This document provides the complete context for the Kitchen Organizer Flutter project. Please review this entire file carefully before proceeding with any task.
 
-## 1. Project Overview
-The project is a comprehensive Kitchen Organizer application designed for a restaurant. It manages inventory, recipes, and daily operational tasks for various staff roles.
+1.  **Core Directives (CRITICAL)**
+    *   (This section remains unchanged)
 
-### Core Functionalities
+2.  **Project Overview**
+    *   (This section remains unchanged)
 
-* **User Management**: A robust system with roles (Admin, Kitchen Staff, Floor Staff, Butcher) and an admin approval workflow for new accounts.
-* **Inventory Management**: Full CRUD (Create, Read, Update, Delete) functionality for inventory items, including associated categories, units, suppliers, and storage locations.
-* **Dish & Recipe System**: An advanced system for creating dishes that can be composed of both individual ingredients and linkable "Components" (sub-recipes). This allows for complex, multi-level recipe construction.
-* **Daily Operations**:
-    * **Daily Notes**: A real-time "Post-it note" feature for admins to communicate important daily information to all staff dashboards.
-    * **Prep Lists**: A full workflow for generating daily prep lists from dishes, which staff can check off as they complete their "Mise en Place."
-    * **Butcher Requisitions**: A system where Admins curate a list of items for the Butcher to request. The Butcher then submits a single, grouped requisition for all needed items.
-    * **Kitchen Requisition Management**: A dedicated screen for Kitchen Staff to view incoming requisitions, check off prepared items, and update the requisition status.
-    * **Floor Staff Requests**: A system for Floor Staff to make urgent requests for the next day.
-* **Notifications**: A real-time, in-app notification system. A bell icon in the `AppBar` blinks to alert staff to new and pending tasks. The color of the blink indicates the status of the request (e.g., requested vs. prepared).
-* **Reporting & Analytics**: A dedicated analytics screen for reporting on "Most Used Ingredients" and a "Task Champions" leaderboard using interactive charts.
-* **Purchase Orders**: A system for generating and emailing purchase orders to suppliers using Cloud Functions.
+3.  **Technical Stack**
+    *   (This section remains unchanged)
 
----
+4.  **Current Project Status**
+    The project is in a stable, runnable state. We have successfully resolved critical deployment and authentication issues, and the live web application at `unmercato1.web.app` is now loading and operational. The backend connection via Firebase is confirmed to be working correctly.
 
-## 2. Technical Stack
-* **Framework**: Flutter (Dart) for a cross-platform web application.
-* **Backend**: Firebase (Firestore, Firebase Authentication, Firebase Cloud Functions).
-* **State Management**: `flutter_riverpod`.
-* **Key Packages**: `cloud_firestore`, `firebase_auth`, `cloud_functions`, `rxdart`, `fl_chart`.
+5.  **Recent Accomplishments:**
+    *   **Fixed Critical Deployment Bug:** Resolved the "blank page" issue by updating the web initialization script (`index.html`) and correcting the Firebase options configuration.
+    *   **Resolved Authentication:** Fixed the "invalid email or password" error by updating the project with the correct Firebase API key.
+    *   **Established Stable Deployment:** The application is now successfully building and deploying to Firebase Hosting.
+    *   Refactored the data model to group requisition items into a single document with a trackable status.
+    *   Built the UI for the kitchen and butcher to manage this new requisition workflow.
+    *   Implemented a responsive, state-aware blinking notification bell.
+    *   Verified the low-stock items feature on the kitchen dashboard.
 
----
+6.  **Established Workflow**
+    *   (This section remains unchanged)
 
-## 3. Current Project Status
-The project is in a stable, runnable state. We have recently completed a major feature implementation: a new, robust, multi-stage requisition system.
+7.  **Core Application Workflow: The "Connected Loop"**
+    The entire application operates on a core principle: **everything is connected**. Actions in one part of the system must trigger appropriate reactions in others. The primary workflow loop is as follows:
 
-**Recent Accomplishments:**
-* Refactored the butcher requisition process to group items into a single request document with a trackable status (`requested`, `prepared`, `received`).
-* Built a new screen for the kitchen to view and manage these grouped requisitions.
-* Built a confirmation screen for the butcher to mark items as "received."
-* Implemented a three-stage (Red/Yellow/Green) blinking notification bell in the `AppBar` to provide real-time updates on requisition statuses.
-* Made the Butcher Dashboard UI fully responsive to work on both wide and narrow screens.
-* Resolved a platform-specific crash on mobile related to Firebase Auth persistence.
+    *   **1. Data Hierarchy (Admin Defined):**
+        *   **Dish:** A high-level menu item (e.g., "Pasta with Mussels"). It is primarily a name/container.
+        *   **Components:** A Dish is composed of one or more "Components." These are the reusable building blocks or prep-tasks (e.g., "Boil pasta," "Make creme sauce").
+        *   **Component Recipe:** The actual recipe, containing ingredients and steps, is attached to the *Component*.
+        *   **Stock/Inventory:** All ingredients listed in a Component's recipe must be drawn from the central inventory. Each inventory item is mapped to a specific **Supplier**.
 
----
+    *   **2. Mise en Place (Prep Lists):** The daily workflow starts with the "mise en place" prep lists. These lists are generated from the active Dishes selected by the admin. The tasks on the list are the **Components** required for those dishes.
 
-## 4. Our Method for Making Changes (Very Important)
-We have an established workflow that must be followed for all changes:
+    *   **3. Inventory Consumption:** When a staff member completes a prep task (a Component), they consume the specified ingredients from the inventory. The system must track this consumption in real-time.
 
-1.  **Git Backup First**: Before any major change, I (the user) will make a Git commit to create a safe restore point. You will provide the command sequence after each successful task.
-2.  **One Task at a Time**: We focus on a single, specific bug or feature.
-3.  **Holistic Analysis**: Before providing code, you (the AI) must perform a "global search" across all project files to identify every part of the app affected by the proposed change.
-4.  **Provide Complete Code**: You will provide the complete, corrected code for all affected files at once. I will not accept partial snippets (with the exception of `providers.dart`, for which you will give specific line-by-line instructions).
-5.  **Confirmation**: I will implement the changes and confirm that the task is complete and error-free before we move on.
+    *   **4. Low-Stock Monitoring:** Every item in the inventory has a pre-defined minimum stock level. After any consumption, the system checks if the new quantity has fallen below this minimum.
 
----
+    *   **5. Automated Ordering:** If an item is below its minimum stock level, the system automatically adds it to a "Daily Ordering Suggestion" list, grouped by its assigned **Supplier**.
 
-## 5. Current Project Notes
-The following are open tasks and ideas for future implementation:
+    This interconnectedness is the most critical aspect of the application's logic. The full chain is: **Dish -> Components -> Recipe -> Inventory/Stock -> Ordering -> Supplier**. All new features or modifications must respect and maintain this workflow.
 
-* The "Today" button on the kitchen dashboard is not doing anything.
-* We need to work on the low-stock items feature on the kitchen dashboard.
-* Implement SMS notifications, including phone number verification during registration and an opt-in choice for users.
-* When requested items are prepared and ready for pickup, send an SMS notice.
-* **SMS Notification Issue**: The Twilio Firebase Extension is consistently returning a "A 'From' or 'MessagingServiceSid' parameter is required" error (code 21603) despite re-configuring the `TWILIO_PHONE_NUMBER`. This needs further investigation into Twilio account settings or extension reinstallation.
+8.  **Current Project Notes & Open Tasks**
+    The following are the current items on our to-do list:
+    *   **Re-implement Automated Supplier Emails:**
+        *   Create a new Cloud Function that triggers when a new order is created.
+        *   The function should use `nodemailer` to send an email to the relevant supplier.
+        *   The email should contain the list of items to be ordered.

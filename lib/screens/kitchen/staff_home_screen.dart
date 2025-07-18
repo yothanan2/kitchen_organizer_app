@@ -11,7 +11,7 @@ import 'package:kitchen_organizer_app/screens/admin/preparation_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
 import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
-import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart' as kReqScreen;
+import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart' as k_req_screen;
 import 'package:kitchen_organizer_app/screens/kitchen/staff_low_stock_screen.dart';
 
 
@@ -113,7 +113,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
             title: 'Open Requisitions',
             icon: Icons.assignment_turned_in_outlined,
             asyncValue: openRequisitionsCount,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const kReqScreen.KitchenRequisitionScreen())),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const k_req_screen.KitchenRequisitionScreen())),
           ),
           const SizedBox(height: 16),
           _buildMetricCard(
@@ -163,15 +163,15 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                   child: CircularProgressIndicator(strokeWidth: 3),
                 ),
                 error: (err, stack) => Icon(Icons.error_outline, color: Colors.red.shade700),
-                data: (count) {
-                  if (count == 0) {
+                data: (itemCount) {
+                  if (itemCount == 0) {
                     return const Icon(Icons.check_circle_outline, color: Colors.green, size: 30);
                   }
                   return CircleAvatar(
                     radius: 15,
                     backgroundColor: Colors.orange.shade800,
                     child: Text(
-                      count.toString(),
+                      itemCount.toString(),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   );
@@ -187,15 +187,24 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
   }
 
   Widget _buildDateSelector(BuildContext context, DateTime selectedDate) {
+    final bool isToday = DateUtils.isSameDay(selectedDate, DateTime.now());
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
       child: ListTile(
         leading: const Icon(Icons.calendar_today),
         title: Text(
-          "Viewing Prep Tasks For: ${DateFormat('EEEE, MMM d').format(selectedDate)}",
+          "Viewing: ${DateFormat('EEEE, MMM d').format(selectedDate)}",
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        trailing: const Icon(Icons.arrow_drop_down),
+        trailing: isToday
+            ? const Icon(Icons.check_circle, color: Colors.green)
+            : ElevatedButton(
+                onPressed: () {
+                  ref.read(selectedDateProvider.notifier).state = DateTime.now();
+                },
+                child: const Text('Today'),
+              ),
         onTap: () => _selectDate(context),
       ),
     );
@@ -224,7 +233,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                   final String reportedBy = data['reportedBy'] ?? 'Unknown';
                   final String reportedAt = data['createdAt'] != null ? DateFormat('MMM d, hh:mm a').format((data['createdAt'] as Timestamp).toDate()) : '';
                   return ListTile(
-                    tileColor: Colors.white.withOpacity(0.9),
+                    tileColor: Colors.white.withAlpha(230),
                     title: Text(taskName),
                     subtitle: Text('Requested by $reportedBy at $reportedAt'),
                     trailing: IconButton(
@@ -262,7 +271,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  Text('No prep list generated for ${DateFormat('EEEE, MMM d').format(selectedDate)}.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('No prep list generated for ${DateFormat('EEEE, MMM d').format(selectedDate)}.', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   ElevatedButton.icon(
                     onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const PreparationScreen())),

@@ -26,20 +26,20 @@ Color _getGlowColor(String weatherDescription) {
   String lowerCaseDesc = weatherDescription.toLowerCase();
   if (lowerCaseDesc.contains('clear') || lowerCaseDesc.contains('sun')) {
     // Made the sunny glow a bit more intense
-    return Colors.yellow.shade700.withOpacity(0.9);
+    return Colors.yellow.shade700.withAlpha(230);
   }
   if (lowerCaseDesc.contains('rain') || lowerCaseDesc.contains('drizzle') || lowerCaseDesc.contains('showers')) {
-    return Colors.blue.withOpacity(0.7);
+    return Colors.blue.withAlpha(178);
   }
   if (lowerCaseDesc.contains('thunderstorm')) {
-    return Colors.red.withOpacity(0.8);
+    return Colors.red.withAlpha(204);
   }
   if (lowerCaseDesc.contains('snow')) {
-    return Colors.lightBlue.shade200.withOpacity(0.9);
+    return Colors.lightBlue.shade200.withAlpha(230);
   }
   // ADDED 'overcast' to this condition
   if (lowerCaseDesc.contains('cloudy') || lowerCaseDesc.contains('overcast') || lowerCaseDesc.contains('fog')) {
-    return Colors.grey.withOpacity(0.7);
+    return Colors.grey.withAlpha(178);
   }
   return Colors.transparent; // No glow for unknown conditions
 }
@@ -97,7 +97,7 @@ class WeatherCard extends ConsumerWidget {
                         Text('Today: ${weather.dailyWeatherIcon} ${weather.dailyWeatherDescription}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor)),
                         if (precipitationInfo != null) ...[
                           const SizedBox(height: 8),
-                          Text('❗️ $precipitationInfo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor.withOpacity(0.9))),
+                          Text('❗️ $precipitationInfo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor.withAlpha(230))),
                         ]
                       ],
                     ),
@@ -105,8 +105,8 @@ class WeatherCard extends ConsumerWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('Max: ${weather.maxTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
-                      Text('Min: ${weather.minTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
+                      Text('Max: ${weather.maxTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 14, color: textColor.withAlpha(178))),
+                      Text('Min: ${weather.minTemp.toStringAsFixed(1)}°C', style: TextStyle(fontSize: 14, color: textColor.withAlpha(178))),
                     ],
                   ),
                 ],

@@ -103,11 +103,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             phoneNumber: _phoneNumberController.text.trim(),
             verificationCompleted: (PhoneAuthCredential credential) async {
               await currentUser.linkWithCredential(credential);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Phone number automatically verified!'), backgroundColor: Colors.green),
-                );
-              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Phone number automatically verified!'), backgroundColor: Colors.green),
+              );
               // Update Firestore immediately if auto-verified
               await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).update({
                 'fullName': _fullNameController.text.trim(),
@@ -115,16 +114,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 'phoneNumber': _phoneNumberController.text.trim(),
                 'smsOptIn': _smsOptIn,
               });
-              if (mounted) {
-                Navigator.of(context).pop();
-              }
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
             },
             verificationFailed: (FirebaseAuthException e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Phone verification failed: ${e.message}'), backgroundColor: Colors.red),
-                );
-              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Phone verification failed: ${e.message}'), backgroundColor: Colors.red),
+              );
               setState(() {
                 _isLoading = false;
               });
@@ -134,11 +131,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _verificationId = verificationId;
                 _codeSent = true;
               });
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('SMS code sent to your phone.'), backgroundColor: Colors.blue),
-                );
-              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('SMS code sent to your phone.'), backgroundColor: Colors.blue),
+              );
             },
             codeAutoRetrievalTimeout: (String verificationId) {
               setState(() {
@@ -154,9 +150,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             'phoneNumber': _phoneNumberController.text.trim(),
             'smsOptIn': _smsOptIn,
           });
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -165,11 +160,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         errorMessage = 'An account already exists for that email.';
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -189,25 +183,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         smsCode: _smsCodeController.text.trim(),
       );
       await FirebaseAuth.instance.currentUser!.linkWithCredential(credential);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Phone number verified and linked!'), backgroundColor: Colors.green),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone number verified and linked!'), backgroundColor: Colors.green),
+      );
       // Update Firestore with verified phone number and smsOptIn status
       await FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).update({
         'phoneNumber': _phoneNumberController.text.trim(),
         'smsOptIn': true,
       });
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to verify phone number: ${e.message}'), backgroundColor: Colors.red),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to verify phone number: ${e.message}'), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) {
         setState(() {

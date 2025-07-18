@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:kitchen_organizer_app/controllers/edit_dish_controller.dart';
 import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/models/models.dart';
@@ -28,6 +29,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
   final _dishNameController = TextEditingController();
   final _categoryController = TextEditingController();
   final _recipeInstructionsController = TextEditingController();
+  final _notesController = TextEditingController();
 
   @override
   void initState() {
@@ -41,6 +43,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
           if (_dishNameController.text != dish.dishName) _dishNameController.text = dish.dishName;
           if (_categoryController.text != dish.category) _categoryController.text = dish.category;
           if (_recipeInstructionsController.text != dish.recipeInstructions) _recipeInstructionsController.text = dish.recipeInstructions;
+          if (_notesController.text != dish.notes) _notesController.text = dish.notes;
         }
       },
       fireImmediately: true,
@@ -52,7 +55,59 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
     _dishNameController.dispose();
     _categoryController.dispose();
     _recipeInstructionsController.dispose();
+    _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showComponentDialog() async {
+    DocumentSnapshot? selectedComponent;
+
+    Future<List<DocumentSnapshot>> getComponents(String? filter) async {
+      final query = FirebaseFirestore.instance
+          .collection('dishes')
+          .where('isComponent', isEqualTo: true)
+          .orderBy('dishName');
+      return (await query.get()).docs;
+    }
+
+    final newComponent = await showDialog<DocumentSnapshot>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Add Component"),
+          content: DropdownSearch<DocumentSnapshot>(
+            asyncItems: getComponents,
+            itemAsString: (doc) => (doc.data() as Map<String, dynamic>)['dishName'],
+            popupProps: const PopupProps.menu(showSearchBox: true),
+            dropdownDecoratorProps: const DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(labelText: "Select Component"),
+            ),
+            onChanged: (newlySelectedDoc) {
+              selectedComponent = newlySelectedDoc;
+            },
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Cancel")),
+            ElevatedButton(
+              child: const Text("Add"),
+              onPressed: () {
+                Navigator.of(context).pop(selectedComponent);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newComponent != null) {
+      final newTask = PrepTask(
+        id: '', // Firestore will generate
+        taskName: (newComponent.data() as Map<String, dynamic>)['dishName'],
+        linkedDishRef: newComponent.reference,
+        order: 0, // Controller will handle order
+      );
+      ref.read(editDishControllerProvider((dish: widget.dish, isCreatingComponent: widget.isCreatingComponent)).notifier).addPrepTask(newTask);
+    }
   }
 
   Future<void> _showIngredientDialog() async {
@@ -99,7 +154,6 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                 ),
                 if (!isOnHand) ...[
                   TextField(controller: quantityController, decoration: const InputDecoration(labelText: "Quantity"), keyboardType: TextInputType.number),
-                  // In a future step, we could make this unit dropdown more robust.
                 ]
               ]),
             ),
@@ -141,9 +195,11 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
       loading: () => Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
       error: (err, stack) => Scaffold(appBar: AppBar(), body: Center(child: Text('Error loading dish: $err'))),
       data: (dish) {
+        final bool isComponent = widget.isCreatingComponent || dish.isComponent;
+
         return Scaffold(
           appBar: AppBar(
-            title: Text(dish.id.isNotEmpty ? 'Edit Dish' : 'Create New Dish'),
+            title: Text(dish.id.isNotEmpty ? 'Edit ${isComponent ? "Component" : "Dish"}' : 'Create New ${isComponent ? "Component" : "Dish"}'),
             actions: [
               if (state.isSaving)
                 const Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(color: Colors.white))
@@ -157,16 +213,16 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                       dishName: _dishNameController.text,
                       category: _categoryController.text,
                       instructions: _recipeInstructionsController.text,
+                      notes: _notesController.text,
                     );
 
                     final error = await controller.saveDish();
-                    if (mounted) {
-                      if (error == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dish saved successfully!'), backgroundColor: Colors.green));
-                        Navigator.of(context).pop();
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                      }
+                    if (!context.mounted) return;
+                    if (error == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved successfully!'), backgroundColor: Colors.green));
+                      Navigator.of(context).pop();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
                     }
                   },
                   tooltip: "Save",
@@ -182,23 +238,11 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                 children: [
                   TextFormField(
                     controller: _dishNameController,
-                    decoration: InputDecoration(labelText: dish.isComponent ? "Component Name" : "Dish Name"),
+                    decoration: InputDecoration(labelText: isComponent ? "Component Name" : "Dish Name"),
                     validator: (v) => (v == null || v.isEmpty) ? "Please enter a name" : null,
                   ),
-                  if (!dish.isComponent) ...[
+                  if (!isComponent) ...[
                     const SizedBox(height: 16),
-                    TextFormField(controller: _categoryController, decoration: const InputDecoration(labelText: "Category")),
-                  ],
-                  const SizedBox(height: 16),
-                  Card(
-                    child: SwitchListTile(
-                      title: const Text("Is a Component"),
-                      subtitle: const Text("Can be used in other recipes."),
-                      value: dish.isComponent,
-                      onChanged: (value) => controller.updateDetails(isComponent: value),
-                    ),
-                  ),
-                  if (!dish.isComponent)
                     Card(
                       child: SwitchListTile(
                         title: const Text("Is Active"),
@@ -207,38 +251,77 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                         onChanged: (value) => controller.updateDetails(isActive: value),
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Components", style: Theme.of(context).textTheme.titleMedium),
+                        ElevatedButton.icon(onPressed: _showComponentDialog, icon: const Icon(Icons.add), label: const Text("Add"))
+                      ],
+                    ),
+                    if (dish.prepTasks.isEmpty)
+                      const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No components added.")))
+                    else
+                      ReorderableListView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: dish.prepTasks.map((task) {
+                          return ListTile(
+                            key: ValueKey(task.id),
+                            dense: true,
+                            leading: const Icon(Icons.drag_handle),
+                            title: Text(task.taskName),
+                            trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => controller.removePrepTask(dish.prepTasks.indexOf(task))),
+                          );
+                        }).toList(),
+                        onReorder: (oldIndex, newIndex) {
+                          controller.reorderPrepTasks(oldIndex, newIndex);
+                        },
+                      ),
+                  ],
+                  if (isComponent) ...[
+                    const SizedBox(height: 16),
+                    TextFormField(controller: _categoryController, decoration: const InputDecoration(labelText: "Category")),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Ingredients", style: Theme.of(context).textTheme.titleMedium),
+                        ElevatedButton.icon(onPressed: _showIngredientDialog, icon: const Icon(Icons.add), label: const Text("Add"))
+                      ],
+                    ),
+                    if (dish.ingredients.isEmpty)
+                      const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No ingredients added.")))
+                    else
+                      ...dish.ingredients.map((ingredient) {
+                        final index = dish.ingredients.indexOf(ingredient);
+                        return ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.fiber_manual_record, size: 10),
+                          title: FirestoreNameWidget(
+                            docRef: ingredient.inventoryItemRef,
+                            builder: (context, name) => Text(name),
+                          ),
+                          trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => controller.removeIngredient(index)),
+                        );
+                      }),
 
+                    const SizedBox(height: 24),
+                    Text("Recipe Instructions", style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _recipeInstructionsController,
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      maxLines: 10,
+                    ),
+                  ],
                   const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Ingredients", style: Theme.of(context).textTheme.titleMedium),
-                      ElevatedButton.icon(onPressed: _showIngredientDialog, icon: const Icon(Icons.add), label: const Text("Add"))
-                    ],
-                  ),
-                  if (dish.ingredients.isEmpty)
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Center(child: Text("No ingredients added.")))
-                  else
-                    ...dish.ingredients.map((ingredient) {
-                      final index = dish.ingredients.indexOf(ingredient);
-                      return ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.fiber_manual_record, size: 10),
-                        title: FirestoreNameWidget(
-                          docRef: ingredient.inventoryItemRef,
-                          builder: (context, name) => Text(name),
-                        ),
-                        trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => controller.removeIngredient(index)),
-                      );
-                    }),
-
-                  const SizedBox(height: 24),
-                  Text("Recipe Instructions", style: Theme.of(context).textTheme.titleMedium),
+                  Text("Notes", style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   TextFormField(
-                    controller: _recipeInstructionsController,
+                    controller: _notesController,
                     decoration: const InputDecoration(border: OutlineInputBorder()),
-                    maxLines: 10,
+                    maxLines: 5,
                   ),
                 ],
               ),
@@ -249,3 +332,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
     );
   }
 }
+
+final editDishControllerProvider = StateNotifierProvider.family<EditDishController, EditDishState, ({Dish? dish, bool isCreatingComponent})>((ref, params) {
+  return EditDishController(ref, params.dish, params.isCreatingComponent);
+});

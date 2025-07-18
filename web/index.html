@@ -8,6 +8,7 @@
   <meta name="description" content="A new Flutter project.">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="kitchen_organizer_app">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -20,22 +21,6 @@
   <script defer src="flutter.js"></script>
 </head>
 <body>
-  <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        entrypointUrl: "main.dart.js", // Specify the entrypoint here
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine({
-            // Pass in your preferred renderer (e.g. "html" or "canvaskit")
-            // If using "canvaskit", make sure to load canvaskit.js first.
-            renderer: "canvaskit", // Keep your chosen renderer
-          }).then(function(appRunner) {
-            appRunner.runApp();
-          });
-        }
-      });
-    });
-  </script>
+  <script src="flutter_bootstrap.js" async=""></script>
 </body>
 </html>

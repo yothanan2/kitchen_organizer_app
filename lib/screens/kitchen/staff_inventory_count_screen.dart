@@ -2,7 +2,6 @@
 // V3: Corrected widget data access to align with the InventoryItem model.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kitchen_organizer_app/providers.dart';
@@ -87,6 +86,7 @@ class _StaffInventoryCountScreenState extends ConsumerState<StaffInventoryCountS
           .doc(docId)
           .update({'quantityOnHand': newQuantity, 'lastUpdated': FieldValue.serverTimestamp()})
           .then((_) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Quantity updated!'), backgroundColor: Colors.green),
         );
@@ -97,6 +97,7 @@ class _StaffInventoryCountScreenState extends ConsumerState<StaffInventoryCountS
         _focusNodes[docId]?.unfocus();
       })
           .catchError((error) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update: $error'), backgroundColor: Colors.red),
         );
@@ -206,56 +207,6 @@ class _StaffInventoryCountScreenState extends ConsumerState<StaffInventoryCountS
           },
         );
       },
-    );
-  }
-}
-
-// The tile is a stateless widget that receives its controller.
-class _InventoryItemTile extends ConsumerWidget {
-  final DocumentSnapshot itemDoc;
-  final TextEditingController controller;
-
-  const _InventoryItemTile({super.key, required this.itemDoc, required this.controller});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final data = itemDoc.data() as Map<String, dynamic>;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data['itemName'] ?? 'No Name', style: const TextStyle(fontSize: 16)),
-                // CORRECTED: This now passes the DocumentReference correctly.
-                SupplierNameWidget(supplierRef: data['supplier'] as DocumentReference?),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 120,
-            child: TextFormField(
-              controller: controller,
-              textAlign: TextAlign.center,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-              decoration: InputDecoration(
-                suffix: Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  // CORRECTED: This now passes the DocumentReference correctly.
-                  child: UnitNameWidget(unitRef: data['unit'] as DocumentReference?),
-                ),
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

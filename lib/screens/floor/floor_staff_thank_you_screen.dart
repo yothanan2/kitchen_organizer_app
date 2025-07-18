@@ -25,7 +25,7 @@ class FloorStaffThankYouScreen extends ConsumerWidget {
     return PopScope(
       canPop: false,
       // UPDATED: This now uses the correct signature and logic.
-      onPopInvoked: (bool didPop) {
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) return;
         _goToDashboard(context);
       },

@@ -60,7 +60,7 @@ class UserManagementScreen extends StatelessWidget {
                 if (dialogContext.mounted) {
                   Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('User ${initialFullName} deleted successfully!'), backgroundColor: Colors.green),
+                    SnackBar(content: Text('User $initialFullName deleted successfully!'), backgroundColor: Colors.green),
                   );
                 }
               } catch (e) {
@@ -158,7 +158,7 @@ class UserManagementScreen extends StatelessWidget {
                       if (dialogContext.mounted) {
                         Navigator.of(dialogContext).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('User ${initialFullName} updated successfully!'), backgroundColor: Colors.green),
+                          SnackBar(content: Text('User $initialFullName updated successfully!'), backgroundColor: Colors.green),
                         );
                       }
                     } catch (e) {

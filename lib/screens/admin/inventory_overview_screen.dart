@@ -11,6 +11,7 @@ import 'package:kitchen_organizer_app/screens/admin/locations_screen.dart';
 import 'package:kitchen_organizer_app/screens/admin/categories_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/widgets/firestore_name_widget.dart'; // <-- IMPORT a single source of truth
+import 'package:kitchen_organizer_app/models/models.dart'; // <-- IMPORT a single source of truth
 
 class InventoryOverviewScreen extends ConsumerWidget {
   const InventoryOverviewScreen({super.key});
@@ -123,10 +124,10 @@ class _InventoryFilteredList extends ConsumerWidget {
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final document = items[index];
-                  final data = document.data() as Map<String, dynamic>;
-                  final bool isLowStock = (data['quantityOnHand'] ?? 0) <= (data['minStockLevel'] ?? 0);
-                  final currentLocationId = (data['location'] as DocumentReference?)?.id;
-                  final itemName = data['itemName'] ?? 'Unnamed Item';
+                  final item = InventoryItem.fromFirestore(document.data() as Map<String, dynamic>, document.id);
+                  final bool isLowStock = item.quantityOnHand <= item.minStockLevel;
+                  final currentLocationId = item.location?.id;
+                  final itemName = item.itemName;
 
                   return Card(
                     color: isLowStock ? Colors.red.shade100 : null,
@@ -163,7 +164,7 @@ class _InventoryFilteredList extends ConsumerWidget {
                               const Icon(Icons.category_outlined, size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
                               FirestoreNameWidget(
-                                docRef: data['category'] != null ? FirebaseFirestore.instance.collection('categories').doc(data['category']) : null,
+                                docRef: item.category, // Use item.category
                                 builder: (context, name) => Text(name),
                               ),
                             ],
@@ -174,11 +175,11 @@ class _InventoryFilteredList extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             FirestoreNameWidget(
-                              docRef: data['unit'] != null ? FirebaseFirestore.instance.collection('units').doc(data['unit']) : null,
+                              docRef: item.unit, // Use item.unit
                               builder: (context, name) => Text(name),
                             ),
                             const SizedBox(width: 8),
-                            Text('${data['quantityOnHand'] ?? 0}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isLowStock ? Colors.red.shade900 : Colors.black)),
+                            Text('${item.quantityOnHand}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isLowStock ? Colors.red.shade900 : Colors.black)),
                             IconButton(
                                 icon: const Icon(Icons.edit_outlined),
                                 tooltip: 'Edit Item',

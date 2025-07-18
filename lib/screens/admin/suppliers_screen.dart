@@ -88,6 +88,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               onPressed: () async {
                 final supplierName = _supplierController.text.trim();
                 if (supplierName.isEmpty) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Supplier Name is required.')),
                   );
@@ -107,7 +108,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 } else {
                   await _suppliersCollection.doc(supplierDocument.id).update(dataToSave);
                 }
-                if (mounted) Navigator.of(context).pop();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
               },
             ),
           ],
@@ -147,7 +149,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     }
 
     // 3. If no items are linked, proceed with the confirmation dialog as before.
-    return showDialog<void>(
+    showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -163,7 +165,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               child: const Text('Delete'),
               onPressed: () async {
                 await _suppliersCollection.doc(docId).delete();
-                if (mounted) Navigator.of(context).pop();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
               },
             ),
           ],

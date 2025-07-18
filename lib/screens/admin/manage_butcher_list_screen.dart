@@ -42,7 +42,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
     final bool isEditing = document != null;
 
     if (isEditing) {
-      final data = document!.data() as Map<String, dynamic>?;
+      final data = document.data() as Map<String, dynamic>?;
       if (data != null) {
         selectedItem = ButcherListItem(name: data['name'] ?? '', source: 'Pre-selected');
         if (data['allowedUnitRefs'] != null) {
@@ -247,7 +247,7 @@ class _ManageButcherListScreenState extends ConsumerState<ManageButcherListScree
     try {
       await batch.commit();
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving order: $e'), backgroundColor: Colors.red),
       );

@@ -159,7 +159,7 @@ class _FloorStaffDashboardScreenState extends ConsumerState<FloorStaffDashboardS
 
     final Animation<Color?> buttonBlinkColorAnimation = ColorTween(
       begin: Colors.red.shade700,
-      end: Theme.of(context).primaryColor.withOpacity(0.7),
+      end: Theme.of(context).primaryColor.withAlpha(178),
     ).animate(_blinkAnimationController);
 
     return Scaffold(

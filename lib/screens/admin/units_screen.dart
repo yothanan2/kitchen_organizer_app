@@ -131,17 +131,19 @@ class _UnitsScreenState extends State<UnitsScreen> {
               onPressed: () async {
                 try {
                   await unitRef.delete();
-                  if (!mounted) return;
+                  if (!dialogContext.mounted) return;
                   Navigator.of(dialogContext).pop();
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('"$unitName" deleted successfully.')),
                   );
                 } catch (e) {
+                  if (!dialogContext.mounted) return;
+                  Navigator.of(dialogContext).pop();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error deleting unit: ${e.toString()}')),
                   );
-                  Navigator.of(dialogContext).pop();
                 }
               },
             ),

@@ -138,6 +138,7 @@ class _ButcherRequisitionScreenState
     });
 
     if (itemsToSubmit.isEmpty) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text("Please check and fill out at least one item."),
           backgroundColor: Colors.orange));

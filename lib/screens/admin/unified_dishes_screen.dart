@@ -68,7 +68,6 @@ class _DishList extends StatelessWidget {
     final dishName =
         (dishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown';
 
-    // Capture context-sensitive objects before async gaps
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final theme = Theme.of(context);
@@ -77,18 +76,24 @@ class _DishList extends StatelessWidget {
       final linkedTasksQuery = await FirebaseFirestore.instance
           .collectionGroup('prepTasks')
           .where('linkedDishRef', isEqualTo: dishDoc.reference)
-          .limit(1)
           .get();
 
       if (linkedTasksQuery.docs.isNotEmpty) {
-        // Use the captured navigator context
-        if (!navigator.mounted) return;
+        final List<String> parentDishNames = [];
+        for (final doc in linkedTasksQuery.docs) {
+          final parentDishDoc = await doc.reference.parent.parent!.get();
+          if (parentDishDoc.exists) {
+            parentDishNames.add((parentDishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown Dish');
+          }
+        }
+
+        if (!context.mounted) return;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Cannot Delete Component'),
             content: Text(
-                'The component "$dishName" cannot be deleted because it is currently being used as a prep step in one or more dishes. Please remove it from those dishes first.'),
+                'The component "$dishName" is used in the following dishes: \n\n- ${parentDishNames.join("\n- ")}\n\nPlease remove it from these dishes first.'),
             actions: [
               TextButton(
                   child: const Text('OK'),
@@ -138,12 +143,14 @@ class _DishList extends StatelessWidget {
         batch.delete(dishDoc.reference);
         await batch.commit();
 
+        if (!context.mounted) return;
         messenger.showSnackBar(
           SnackBar(
               content: Text("'$dishName' deleted successfully"),
               backgroundColor: Colors.green),
         );
       } catch (e) {
+        if (!context.mounted) return;
         messenger.showSnackBar(
           SnackBar(
               content: Text("Error deleting: $e"),

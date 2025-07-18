@@ -186,6 +186,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 };
 
                 if ((isCustom && customItemController.text.trim() == '') || (!isCustom && selectedInventoryItemId == null) || newItemData['quantity'] == 0 || selectedUnitId == null) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields correctly.")));
                   return;
                 }

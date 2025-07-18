@@ -10,7 +10,13 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Error loading .env file: $e");
+    // It's fine to continue without it in a web environment
+    // as we might be using dart-define for secrets.
+  }
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -36,9 +42,7 @@ class KitchenOrganizerApp extends StatelessWidget {
       seedColor: primaryColor,
       primary: primaryColor,
       secondary: secondaryColor,
-      background: backgroundColor,
-      onBackground: textColor,
-      surface: Colors.white,
+      surface: backgroundColor,
       onSurface: textColor,
       brightness: Brightness.light,
     );

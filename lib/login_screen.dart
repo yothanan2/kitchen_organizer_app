@@ -70,10 +70,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       );
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Invalid email or password.';
-      if (e.code == 'user-not-found') errorMessage = 'No user found for that email.';
-      else if (e.code == 'wrong-password') errorMessage = 'Wrong password provided for that user.';
-      else if (e.code == 'invalid-credential') errorMessage = 'Invalid credentials. Please check your email and password.';
-      else if (e.code == 'invalid-email') errorMessage = 'The email address is not valid.';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No user found for that email.';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Wrong password provided for that user.';
+      } else if (e.code == 'invalid-credential') {
+        errorMessage = 'Invalid credentials. Please check your email and password.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'The email address is not valid.';
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -108,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(context).primaryColor.withOpacity(0.7),
+              Theme.of(context).primaryColor.withAlpha(178),
               Colors.deepPurple.shade100,
               Colors.white,
             ],

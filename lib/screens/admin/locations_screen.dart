@@ -46,11 +46,10 @@ class _LocationsScreenState extends State<LocationsScreen> {
 
                 final querySnapshot = await _locationsCollection.where('name', isEqualTo: locationName).limit(1).get();
                 if (querySnapshot.docs.isNotEmpty && (locationDocument == null || querySnapshot.docs.first.id != locationDocument.id)) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('A location with the name "$locationName" already exists.')),
-                    );
-                  }
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('A location with the name "$locationName" already exists.')),
+                  );
                   return;
                 }
 
@@ -59,7 +58,8 @@ class _LocationsScreenState extends State<LocationsScreen> {
                 } else {
                   _locationsCollection.doc(locationDocument.id).update({'name': locationName});
                 }
-                if (mounted) Navigator.of(context).pop();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
               },
             ),
           ],
@@ -101,7 +101,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
     }
 
     // 4. If no items are linked, proceed with the original confirmation dialog.
-    return showDialog<void>(
+    showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(

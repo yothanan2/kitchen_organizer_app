@@ -7,10 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:kitchen_organizer_app/screens/kitchen/staff_home_screen.dart';
-import 'package:kitchen_organizer_app/screens/kitchen/staff_inventory_count_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/widgets/notification_bell_widget.dart';
-import 'package:kitchen_organizer_app/screens/user/edit_profile_screen.dart';
 
 class StaffWrapperScreen extends ConsumerWidget {
   const StaffWrapperScreen({super.key});

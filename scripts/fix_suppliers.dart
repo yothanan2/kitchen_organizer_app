@@ -1,10 +1,11 @@
 // scripts/fix_suppliers.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
-  print("Initializing Firebase...");
+  debugPrint("Initializing Firebase...");
 
   // Using the specific 'web' configuration from your firebase_options.dart
   await Firebase.initializeApp(
@@ -19,14 +20,14 @@ void main() async {
     ),
   );
 
-  print("Firebase Initialized.");
+  debugPrint("Firebase Initialized.");
 
   final firestore = FirebaseFirestore.instance;
   final batch = firestore.batch();
   int itemsToUpdate = 0;
 
   try {
-    print("Fetching all suppliers...");
+    debugPrint("Fetching all suppliers...");
     final suppliersSnapshot = await firestore.collection('suppliers').get();
     final Map<String, DocumentReference> supplierRefsById = {
       for (var doc in suppliersSnapshot.docs) doc.id: doc.reference
@@ -34,11 +35,11 @@ void main() async {
     final Map<String, DocumentReference> supplierRefsByName = {
       for (var doc in suppliersSnapshot.docs) (doc.data()['name'] as String) : doc.reference
     };
-    print("Found ${supplierRefsById.length} suppliers.");
+    debugPrint("Found ${supplierRefsById.length} suppliers.");
 
-    print("Fetching all inventory items to check them...");
+    debugPrint("Fetching all inventory items to check them...");
     final inventorySnapshot = await firestore.collection('inventoryItems').get();
-    print("Found ${inventorySnapshot.docs.length} total inventory items.");
+    debugPrint("Found ${inventorySnapshot.docs.length} total inventory items.");
 
     for (final itemDoc in inventorySnapshot.docs) {
       final data = itemDoc.data();
@@ -55,26 +56,26 @@ void main() async {
         correctSupplierRef = supplierRefsById[supplierIdString] ?? supplierRefsByName[supplierIdString];
 
         if (correctSupplierRef != null) {
-          print('Fixing item: ${data['itemName']} (id: ${itemDoc.id})');
+          debugPrint('Fixing item: ${data['itemName']} (id: ${itemDoc.id})');
           batch.update(itemDoc.reference, {'supplier': correctSupplierRef});
           itemsToUpdate++;
         } else {
-          print('Warning: Could not find supplier reference for ID or Name: $supplierIdString for item ${data['itemName']}');
+          debugPrint('Warning: Could not find supplier reference for ID or Name: $supplierIdString for item ${data['itemName']}');
         }
       }
     }
 
     if (itemsToUpdate > 0) {
-      print("\nFound $itemsToUpdate items to update. Committing changes...");
+      debugPrint("\nFound $itemsToUpdate items to update. Committing changes...");
       await batch.commit();
-      print("Successfully updated $itemsToUpdate items!");
+      debugPrint("Successfully updated $itemsToUpdate items!");
     } else {
-      print("\nNo items needed fixing. All data is in the correct format.");
+      debugPrint("\nNo items needed fixing. All data is in the correct format.");
     }
 
   } catch (e) {
-    print("\nAn error occurred: $e");
+    debugPrint("\nAn error occurred: $e");
   }
 
-  print("\nScript finished.");
+  debugPrint("\nScript finished.");
 }

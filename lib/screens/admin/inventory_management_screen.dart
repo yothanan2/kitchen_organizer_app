@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kitchen_organizer_app/providers.dart';
@@ -139,7 +138,6 @@ class _InventoryManagementScreenState extends ConsumerState<InventoryManagementS
     final asyncInventoryItems = ref.watch(allInventoryItemsProvider);
     final unitsMapAsync = ref.watch(unitsMapProvider);
     final categoriesMapAsync = ref.watch(categoriesMapProvider);
-    final suppliersMapAsync = ref.watch(suppliersMapProvider);
     final locationsMapAsync = ref.watch(locationsMapProvider);
 
 

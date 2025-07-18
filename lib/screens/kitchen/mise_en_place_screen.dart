@@ -1,28 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // For formatting the date
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kitchen_organizer_app/providers.dart';
 
-class MiseEnPlaceScreen extends StatefulWidget {
+class MiseEnPlaceScreen extends ConsumerStatefulWidget {
   const MiseEnPlaceScreen({super.key});
 
   @override
-  State<MiseEnPlaceScreen> createState() => _MiseEnPlaceScreenState();
+  ConsumerState<MiseEnPlaceScreen> createState() => _MiseEnPlaceScreenState();
 }
 
-class _MiseEnPlaceScreenState extends State<MiseEnPlaceScreen> {
+class _MiseEnPlaceScreenState extends ConsumerState<MiseEnPlaceScreen> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
 
-  // Get today's date formatted as 'yyyy-MM-dd' to match our document ID
-  String get _todayDocId {
-    return DateFormat('yyyy-MM-dd').format(DateTime.now());
-  }
-
-  // Function to update a task's completion status
   Future<void> _toggleTaskCompletion(DocumentReference taskRef, bool currentStatus) async {
     try {
       if (!currentStatus) {
-        // If marking as complete
         await taskRef.update({
           'isCompleted': true,
           'completedByUid': currentUser?.uid,
@@ -30,7 +25,6 @@ class _MiseEnPlaceScreenState extends State<MiseEnPlaceScreen> {
           'completedOn': FieldValue.serverTimestamp(),
         });
       } else {
-        // If un-marking as complete
         await taskRef.update({
           'isCompleted': false,
           'completedByUid': FieldValue.delete(),
@@ -48,41 +42,37 @@ class _MiseEnPlaceScreenState extends State<MiseEnPlaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedDate = ref.watch(selectedDateProvider);
+    final selectedDateString = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final tasksAsync = ref.watch(tasksStreamProvider(TaskListParams(collectionPath: 'prepTasks', isCompleted: false, date: selectedDateString)));
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Mise en Place - ${DateFormat.yMMMd().format(DateTime.now())}'),
+        title: Text('Mise en Place - ${DateFormat.yMMMd().format(selectedDate)}'),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        // This is the updated stream to get today's task list
-        stream: FirebaseFirestore.instance
-            .collection('dailyTodoLists')
-            .doc(_todayDocId) // Get the document for today's date
-            .collection('tasks') // Get the tasks from its sub-collection
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            debugPrint('Firestore Stream Error: ${snapshot.error}');
-            return const Center(child: Text('Something went wrong fetching tasks.'));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+      body: tasksAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) {
+          debugPrint('Firestore Stream Error: $err');
+          return const Center(child: Text('Something went wrong fetching tasks.'));
+        },
+        data: (snapshot) {
+          if (snapshot.docs.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded, size: 80, color: Colors.green),
-                    const SizedBox(height: 16),
+                  children: const [
+                    Icon(Icons.check_circle_outline_rounded, size: 80, color: Colors.green),
+                    SizedBox(height: 16),
                     Text(
                       'No tasks scheduled for today!',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8),
+                    Text(
                       'Tasks are added from the "Fill in Tasks for Tomorrow" screen.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 16, color: Colors.grey),
@@ -93,7 +83,7 @@ class _MiseEnPlaceScreenState extends State<MiseEnPlaceScreen> {
             );
           }
 
-          final tasks = snapshot.data!.docs;
+          final tasks = snapshot.docs;
 
           return ListView.builder(
             itemCount: tasks.length,

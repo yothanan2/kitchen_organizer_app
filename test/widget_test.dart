@@ -1,10 +1,7 @@
-// This is a basic Flutter widget test.
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kitchen_organizer_app/main.dart';
-import 'package:kitchen_organizer_app/login_screen.dart';
 import 'package:kitchen_organizer_app/auth_gate.dart';
 
 void main() {

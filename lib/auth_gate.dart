@@ -31,7 +31,6 @@ class AuthGate extends ConsumerWidget {
           return const LoginScreen();
         }
 
-        final user = snapshot.data!;
         final appUserAsync = ref.watch(appUserProvider);
 
         // Notifications are now handled by the NotificationBellWidget.
