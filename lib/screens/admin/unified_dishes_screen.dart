@@ -198,7 +198,6 @@ class _DishList extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: ListTile(
                 title: Text(dish.dishName),
-                subtitle: Text(dish.category),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(

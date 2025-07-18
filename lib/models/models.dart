@@ -133,7 +133,6 @@ class InventoryItem {
 class Dish {
   final String id;
   final String dishName;
-  final String category;
   final String recipeInstructions;
   final bool isActive;
   final bool isComponent;
@@ -145,7 +144,6 @@ class Dish {
   Dish({
     required this.id,
     required this.dishName,
-    required this.category,
     required this.recipeInstructions,
     required this.isActive,
     required this.isComponent,
@@ -159,7 +157,6 @@ class Dish {
     return Dish(
       id: '',
       dishName: '',
-      category: '',
       recipeInstructions: '',
       isActive: true,
       isComponent: isComponent,
@@ -170,7 +167,6 @@ class Dish {
   Dish copyWith({
     String? id,
     String? dishName,
-    String? category,
     String? recipeInstructions,
     bool? isActive,
     bool? isComponent,
@@ -182,7 +178,6 @@ class Dish {
     return Dish(
       id: id ?? this.id,
       dishName: dishName ?? this.dishName,
-      category: category ?? this.category,
       recipeInstructions: recipeInstructions ?? this.recipeInstructions,
       isActive: isActive ?? this.isActive,
       isComponent: isComponent ?? this.isComponent,
@@ -197,7 +192,6 @@ class Dish {
     return Dish(
       id: id,
       dishName: data['dishName'] ?? 'Unnamed Dish',
-      category: data['category'] ?? 'Uncategorized',
       recipeInstructions: data['recipeInstructions'] ?? '',
       isActive: data['isActive'] ?? true,
       isComponent: data['isComponent'] ?? false,
@@ -209,7 +203,6 @@ class Dish {
   Map<String, dynamic> toFirestore() {
     return {
       'dishName': dishName,
-      'category': category,
       'recipeInstructions': recipeInstructions,
       'isActive': isActive,
       'isComponent': isComponent,

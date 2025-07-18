@@ -27,7 +27,6 @@ class EditDishScreen extends ConsumerStatefulWidget {
 class _EditDishScreenState extends ConsumerState<EditDishScreen> {
   final _formKey = GlobalKey<FormState>();
   final _dishNameController = TextEditingController();
-  final _categoryController = TextEditingController();
   final _recipeInstructionsController = TextEditingController();
   final _notesController = TextEditingController();
 
@@ -41,7 +40,6 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
         final dish = next.dish.value;
         if (dish != null) {
           if (_dishNameController.text != dish.dishName) _dishNameController.text = dish.dishName;
-          if (_categoryController.text != dish.category) _categoryController.text = dish.category;
           if (_recipeInstructionsController.text != dish.recipeInstructions) _recipeInstructionsController.text = dish.recipeInstructions;
           if (_notesController.text != dish.notes) _notesController.text = dish.notes;
         }
@@ -53,7 +51,6 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
   @override
   void dispose() {
     _dishNameController.dispose();
-    _categoryController.dispose();
     _recipeInstructionsController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -112,12 +109,17 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
 
   Future<void> _showIngredientDialog() async {
     String? selectedInventoryItemId;
-    String? selectedUnitId;
+    DocumentSnapshot? selectedUnitDoc; // Changed to hold the full DocumentSnapshot
     final quantityController = TextEditingController();
     bool isOnHand = false;
 
     Future<List<DocumentSnapshot>> getInventoryItems(String? filter) async {
       return (await FirebaseFirestore.instance.collection('inventoryItems').orderBy('itemName').get()).docs;
+    }
+
+    // New function to get units
+    Future<List<DocumentSnapshot>> getUnits(String? filter) async {
+      return (await FirebaseFirestore.instance.collection('units').orderBy('name').get()).docs;
     }
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -137,12 +139,17 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                   dropdownDecoratorProps: const DropDownDecoratorProps(
                     dropdownSearchDecoration: InputDecoration(labelText: "Select Inventory Item"),
                   ),
-                  onChanged: (newlySelectedDoc) {
+                  onChanged: (newlySelectedDoc) async {
                     if (newlySelectedDoc != null) {
                       final data = newlySelectedDoc.data() as Map<String, dynamic>?;
+                      final unitRef = data?['unit'] as DocumentReference?;
+                      DocumentSnapshot? unitDoc;
+                      if (unitRef != null) {
+                        unitDoc = await unitRef.get();
+                      }
                       setDialogState(() {
                         selectedInventoryItemId = newlySelectedDoc.id;
-                        selectedUnitId = (data?['unit'] as DocumentReference?)?.id;
+                        selectedUnitDoc = unitDoc; // Store the whole doc
                       });
                     }
                   },
@@ -154,6 +161,21 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                 ),
                 if (!isOnHand) ...[
                   TextField(controller: quantityController, decoration: const InputDecoration(labelText: "Quantity"), keyboardType: TextInputType.number),
+                  const SizedBox(height: 16),
+                  DropdownSearch<DocumentSnapshot>(
+                    asyncItems: getUnits,
+                    itemAsString: (doc) => (doc.data() as Map<String, dynamic>)['name'],
+                    selectedItem: selectedUnitDoc, // Pre-select the unit
+                    popupProps: const PopupProps.menu(showSearchBox: true),
+                    dropdownDecoratorProps: const DropDownDecoratorProps(
+                      dropdownSearchDecoration: InputDecoration(labelText: "Unit"),
+                    ),
+                    onChanged: (newlySelectedUnit) {
+                      setDialogState(() {
+                        selectedUnitDoc = newlySelectedUnit;
+                      });
+                    },
+                  ),
                 ]
               ]),
             ),
@@ -162,16 +184,17 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
               ElevatedButton(
                 child: const Text("Save"),
                 onPressed: () {
-                  bool isValid = selectedInventoryItemId != null && (isOnHand || (quantityController.text.isNotEmpty));
+                  // Updated validation to include unit selection
+                  bool isValid = selectedInventoryItemId != null && (isOnHand || (quantityController.text.isNotEmpty && selectedUnitDoc != null));
                   if (isValid) {
                     Navigator.of(context).pop({
                       'inventoryItemId': selectedInventoryItemId,
                       'quantity': isOnHand ? null : num.tryParse(quantityController.text),
-                      'unitId': isOnHand ? null : selectedUnitId,
+                      'unitId': isOnHand ? null : selectedUnitDoc?.id, // Pass the id from the selected doc
                       'type': isOnHand ? 'on-hand' : 'quantified'
                     });
                   } else {
-                    scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Please fill all required fields.")));
+                    scaffoldMessenger.showSnackBar(const SnackBar(content: Text("Please fill all required fields, including the unit.")));
                   }
                 },
               ),
@@ -211,7 +234,6 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
 
                     controller.updateDetails(
                       dishName: _dishNameController.text,
-                      category: _categoryController.text,
                       instructions: _recipeInstructionsController.text,
                       notes: _notesController.text,
                     );
@@ -230,7 +252,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             child: Form(
               key: _formKey,
               child: Column(
@@ -280,8 +302,6 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                       ),
                   ],
                   if (isComponent) ...[
-                    const SizedBox(height: 16),
-                    TextFormField(controller: _categoryController, decoration: const InputDecoration(labelText: "Category")),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -422,6 +422,17 @@ final inventoryGroupsProvider = StreamProvider.autoDispose<Map<String, List<Docu
 final todaysListExistsProvider = StreamProvider.autoDispose.family<bool, String>((ref, date) => ref.watch(firestoreProvider).collection('dailyTodoLists').doc(date).collection('prepTasks').limit(1).snapshots().map((s) => s.docs.isNotEmpty));
 final showCompletedTasksProvider = StateProvider<bool>((ref) => false);
 
+final prepTasksCountProvider = StreamProvider.autoDispose.family<int, String>((ref, date) {
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('dailyTodoLists')
+      .doc(date)
+      .collection('prepTasks')
+      .where('isCompleted', isEqualTo: false)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.length);
+});
+
 final isViewingAsStaffProvider = StateProvider<bool>((ref) => false);
 
 

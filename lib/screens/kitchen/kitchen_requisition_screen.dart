@@ -71,9 +71,9 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
     });
   }
 
-  @override
   Widget build(BuildContext context) {
     final data = widget.requisitionDoc.data() as Map<String, dynamic>;
+    final createdBy = data['createdBy'] ?? 'Unknown';
     final forDate = (data['requisitionForDate'] as Timestamp).toDate();
     final status = data['status'] ?? 'unknown';
     final items = List<Map<String, dynamic>>.from(data['items']);
@@ -88,10 +88,10 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
       child: ExpansionTile(
         leading: Icon(statusIcon, color: Theme.of(context).primaryColor),
         title: Text(
-          'Request from \$createdBy for ${DateFormat('EEE, MMM d').format(forDate)}',
+          'Request from $createdBy for ${DateFormat('EEE, MMM d').format(forDate)}',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('Status: \$status'),
+        subtitle: Text('Status: $status'),
         children: [
           for (int i = 0; i < items.length; i++)
             _buildItemTile(items[i], i),
@@ -102,6 +102,7 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
 
   Widget _buildItemTile(Map<String, dynamic> item, int index) {
     final itemName = item['itemName'] ?? 'Unnamed Item';
+    final quantity = item['quantity']?.toString() ?? '';
     final unitRef = item['unitRef'] as DocumentReference?;
     final isPrepared = item['isPrepared'] ?? false;
 
@@ -112,9 +113,9 @@ class _RequisitionCardState extends ConsumerState<RequisitionCard> {
         subtitle: unitRef != null
             ? FirestoreNameWidget(
           docRef: unitRef,
-          builder: (context, unitName) => Text('\$quantity \$unitName'),
+          builder: (context, unitName) => Text('$quantity $unitName'),
         )
-            : Text('\$quantity'),
+            : Text(quantity),
         trailing: Checkbox(
           value: isPrepared,
           onChanged: (value) => _toggleItemPrepared(index, value ?? false),

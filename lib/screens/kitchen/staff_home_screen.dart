@@ -13,6 +13,7 @@ import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
 import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart' as k_req_screen;
 import 'package:kitchen_organizer_app/screens/kitchen/staff_low_stock_screen.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/mise_en_place_screen.dart';
 
 
 class StaffHomeScreen extends ConsumerStatefulWidget {
@@ -22,27 +23,14 @@ class StaffHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<StaffHomeScreen> createState() => _StaffHomeScreenState();
 }
 
-class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<Color?> _colorAnimation;
-
+class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
-
-    _colorAnimation = ColorTween(
-      begin: Colors.red.shade700,
-      end: Colors.orange.shade700,
-    ).animate(_animationController);
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
     super.dispose();
   }
 
@@ -107,28 +95,74 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
           const SizedBox(height: 16),
           const DailyNoteCard(noteFieldName: 'forKitchenStaff'),
           const SizedBox(height: 16),
-          // --- NEW METRIC CARD ---
-          _buildMetricCard(
-            context: context,
-            title: 'Open Requisitions',
-            icon: Icons.assignment_turned_in_outlined,
-            asyncValue: openRequisitionsCount,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const k_req_screen.KitchenRequisitionScreen())),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 600;
+              final cards = [
+                _buildMetricCard(
+                  context: context,
+                  title: 'Mise en Place',
+                  icon: Icons.kitchen_outlined,
+                  asyncValue: ref.watch(prepTasksCountProvider(selectedDateString)),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const MiseEnPlaceScreen())),
+                ),
+                _buildMetricCard(
+                  context: context,
+                  title: 'Open Requisitions',
+                  icon: Icons.assignment_turned_in_outlined,
+                  asyncValue: openRequisitionsCount,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const k_req_screen.KitchenRequisitionScreen())),
+                ),
+                _buildMetricCard(
+                  context: context,
+                  title: 'Low-Stock Items',
+                  icon: Icons.warning_amber_rounded,
+                  asyncValue: lowStockItemsCount,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const StaffLowStockScreen())),
+                ),
+              ];
+
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: cards.map((card) => Expanded(child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: card,
+                  ))).toList(),
+                );
+              } else {
+                return Column(
+                  children: cards.map((card) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: card,
+                  )).toList(),
+                );
+              }
+            },
           ),
           const SizedBox(height: 16),
-          _buildMetricCard(
-            context: context,
-            title: 'Low-Stock Items',
-            icon: Icons.warning_amber_rounded,
-            asyncValue: lowStockItemsCount,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const StaffLowStockScreen())),
-          ),
+          _buildPrepListControls(context, selectedDate, showCompleted),
           const SizedBox(height: 16),
-          _buildDateSelector(context, selectedDate),
-          const SizedBox(height: 16),
-          // --- OLD REQUISITION LIST REMOVED ---
           _buildPrepListSection(isTodaysListGenerated, context, prepTasksAsync, showCompleted, completedPrepTasksAsync, unitsMapAsync, selectedDate),
         ],
+      ),
+    );
+  }
+   Widget _buildPrepListControls(BuildContext context, DateTime selectedDate, bool showCompleted) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            _buildDateSelector(context, selectedDate),
+            SwitchListTile(
+              title: const Text('Show Completed Tasks'),
+              value: showCompleted,
+              onChanged: (value) => ref.read(showCompletedTasksProvider.notifier).state = value,
+              secondary: const Icon(Icons.check_circle_outline),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -141,44 +175,44 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
     required VoidCallback onTap,
   }) {
     return Card(
-      elevation: 4,
+      elevation: 2,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
           child: Row(
             children: [
-              Icon(icon, size: 40, color: Theme.of(context).primaryColor),
-              const SizedBox(width: 16),
+              Icon(icon, size: 32, color: Theme.of(context).primaryColor),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               asyncValue.when(
                 loading: () => const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(strokeWidth: 3),
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 error: (err, stack) => Icon(Icons.error_outline, color: Colors.red.shade700),
                 data: (itemCount) {
                   if (itemCount == 0) {
-                    return const Icon(Icons.check_circle_outline, color: Colors.green, size: 30);
+                    return const Icon(Icons.check_circle_outline, color: Colors.green, size: 24);
                   }
                   return CircleAvatar(
-                    radius: 15,
+                    radius: 12,
                     backgroundColor: Colors.orange.shade800,
                     child: Text(
                       itemCount.toString(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                   );
                 },
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward_ios, color: Colors.grey),
+              const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
             ],
           ),
         ),
@@ -216,36 +250,58 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
       error: (err, stack) => Text('Error loading new bar requests: ${err.toString()}'),
       data: (requests) {
         if (requests.isEmpty) return const SizedBox.shrink();
-        return AnimatedBuilder(
-          animation: _colorAnimation,
-          builder: (context, child) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              color: _colorAnimation.value,
-              elevation: 8,
-              child: ExpansionTile(
-                initiallyExpanded: true,
-                title: Text('New Bar Requests (${requests.length})', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                leading: const Icon(Icons.notifications_active_outlined, color: Colors.white),
-                children: requests.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final String taskName = data['taskName'] ?? 'Unnamed Request';
-                  final String reportedBy = data['reportedBy'] ?? 'Unknown';
-                  final String reportedAt = data['createdAt'] != null ? DateFormat('MMM d, hh:mm a').format((data['createdAt'] as Timestamp).toDate()) : '';
-                  return ListTile(
-                    tileColor: Colors.white.withAlpha(230),
-                    title: Text(taskName),
-                    subtitle: Text('Requested by $reportedBy at $reportedAt'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-                      onPressed: () => _toggleTaskCompletion(doc),
-                      tooltip: 'Mark as Reviewed',
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          color: Colors.blue.shade800,
+          elevation: 8,
+          child: ExpansionTile(
+            initiallyExpanded: true,
+            title: Text('New Bar Requests', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            leading: Stack(
+              children: [
+                const Icon(Icons.notifications, color: Colors.white),
+                if (requests.isNotEmpty)
+                  Positioned(
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '${requests.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  );
-                }).toList(),
-              ),
-            );
-          },
+                  ),
+              ],
+            ),
+            children: requests.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final String taskName = data['taskName'] ?? 'Unnamed Request';
+              final String reportedBy = data['reportedBy'] ?? 'Unknown';
+              final String reportedAt = data['createdAt'] != null ? DateFormat('MMM d, hh:mm a').format((data['createdAt'] as Timestamp).toDate()) : '';
+              return ListTile(
+                tileColor: Colors.white.withAlpha(230),
+                title: Text(taskName),
+                subtitle: Text('Requested by $reportedBy at $reportedAt'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.check_circle_outline, color: Colors.green),
+                  onPressed: () => _toggleTaskCompletion(doc),
+                  tooltip: 'Mark as Reviewed',
+                ),
+              );
+            }).toList(),
+          ),
         );
       },
     );
@@ -290,14 +346,6 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
         return Column(
           children: [
             _buildTasksSection(context, title: 'Prep Tasks for ${DateFormat('MMM d').format(selectedDate)}', tasksAsync: prepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No prep tasks for this date.', unitsMapAsync: unitsMapAsync),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Show Completed Tasks:', style: TextStyle(fontSize: 16)),
-                Switch(value: showCompleted, onChanged: (value) => ref.read(showCompletedTasksProvider.notifier).state = value),
-              ],
-            ),
             if (showCompleted) ...[
               const SizedBox(height: 20),
               _buildTasksSection(context, title: 'Completed Prep Tasks', tasksAsync: completedPrepTasksAsListOfDocs, onToggle: _toggleTaskCompletion, isEmptyMessage: 'No completed prep tasks for this date.', unitsMapAsync: unitsMapAsync),
@@ -338,11 +386,12 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                 final String taskName = taskData['taskName'] ?? 'Unnamed Task';
                 final bool isCompleted = taskData['isCompleted'] ?? false;
                 final String? completedBy = taskData['completedBy'];
+                final Timestamp? completedAt = taskData['completedAt'];
                 final Timestamp? createdAt = taskData['createdAt'];
                 String completionInfo = '';
-                if (isCompleted && completedBy != null && createdAt != null) {
-                  final formattedTime = DateFormat('hh:mm a, MMM d').format(createdAt.toDate());
-                  completionInfo = 'Completed by $completedBy at $formattedTime';
+                if (isCompleted && completedBy != null && completedAt != null) {
+                  final formattedTime = DateFormat('hh:mm a, MMM d').format(completedAt.toDate());
+                  completionInfo = 'by $completedBy at $formattedTime';
                 }
 
                 String subtitleText = '';
@@ -356,19 +405,22 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> with SingleTi
                   }
                   subtitleText = 'Quantity: $quantity $unitName - Requested by $requestedBy';
                   if (isCompleted && completionInfo.isNotEmpty) {
-                    subtitleText += '\n$completionInfo';
+                    subtitleText += '\nCompleted $completionInfo';
                   } else if (createdAt != null) {
                     subtitleText += '\nRequested on ${DateFormat('MMM d').format(createdAt.toDate())}';
                   }
                 } else if (isCompleted && completionInfo.isNotEmpty) {
-                  subtitleText = completionInfo;
+                  subtitleText = 'Completed $completionInfo';
                 }
 
                 return Card(
+                  elevation: isCompleted ? 0 : 2,
+                  color: isCompleted ? Colors.grey.shade200 : Colors.white,
                   margin: const EdgeInsets.symmetric(vertical: 4.0),
                   child: CheckboxListTile(
-                    title: Text(taskName, style: TextStyle(decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none, color: isCompleted ? Colors.grey : Colors.black87)),
-                    subtitle: subtitleText.isNotEmpty ? Text(subtitleText, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)) : null,
+                    dense: true,
+                    title: Text(taskName, style: TextStyle(decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none, color: isCompleted ? Colors.grey.shade700 : Colors.black87, fontSize: 16)),
+                    subtitle: subtitleText.isNotEmpty ? Text(subtitleText, style: TextStyle(fontSize: 12, color: isCompleted ? Colors.grey.shade600 : Colors.blueGrey)) : null,
                     value: isCompleted,
                     onChanged: (bool? newValue) => onToggle(taskDoc),
                     controlAffinity: ListTileControlAffinity.leading,

@@ -77,7 +77,6 @@ class EditDishController extends StateNotifier<EditDishState> {
 
   void updateDetails({
     String? dishName,
-    String? category,
     String? instructions,
     String? notes,
     bool? isActive,
@@ -88,7 +87,6 @@ class EditDishController extends StateNotifier<EditDishState> {
         dish: AsyncValue.data(
           dish.copyWith(
             dishName: dishName,
-            category: category,
             recipeInstructions: instructions,
             notes: notes,
             isActive: isActive,

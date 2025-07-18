@@ -32,7 +32,8 @@ final docNameProvider = FutureProvider.autoDispose.family<String, DocumentRefere
   if (docRef == null) return 'N/A';
   final doc = await docRef.get();
   if (doc.exists) {
-    return (doc.data() as Map<String, dynamic>)['name'] ?? 'Unnamed';
+    final data = doc.data() as Map<String, dynamic>;
+    return data['itemName'] as String? ?? data['name'] as String? ?? 'Unnamed';
   }
   return 'Unknown';
 });

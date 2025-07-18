@@ -11,9 +11,17 @@ This document provides the complete context for the Kitchen Organizer Flutter pr
     *   (This section remains unchanged)
 
 4.  **Current Project Status**
-    The project is in a stable, runnable state. We have successfully resolved critical deployment and authentication issues, and the live web application at `unmercato1.web.app` is now loading and operational. The backend connection via Firebase is confirmed to be working correctly.
+    The project is in a stable, runnable state. We have successfully resolved critical deployment and authentication issues, and the live web application at `unmercato1.web.app` is now loading and operational. The backend connection via Firebase is confirmed to be working correctly. All recent changes have been pushed to the `fix/login-issue` branch.
 
 5.  **Recent Accomplishments:**
+    *   **Refactored Dish & Component Management:**
+        *   Separated the UI and logic for creating Dishes (now just a name and status) and Components (which contain recipes, ingredients, etc.).
+        *   Implemented functionality to add, remove, and reorder Components within a Dish.
+        *   Added a "Notes" field to both Dishes and Components for additional details.
+    *   **Improved Component Deletion:**
+        *   Fixed a bug that prevented the deletion of in-use components.
+        *   The error message now helpfully lists the specific Dishes a Component is linked to, allowing admins to resolve the dependency.
+    *   **Resolved Firestore Index Issue:** Created the necessary Firestore index to support the component deletion query.
     *   **Fixed Critical Deployment Bug:** Resolved the "blank page" issue by updating the web initialization script (`index.html`) and correcting the Firebase options configuration.
     *   **Resolved Authentication:** Fixed the "invalid email or password" error by updating the project with the correct Firebase API key.
     *   **Established Stable Deployment:** The application is now successfully building and deploying to Firebase Hosting.
@@ -45,8 +53,4 @@ This document provides the complete context for the Kitchen Organizer Flutter pr
     This interconnectedness is the most critical aspect of the application's logic. The full chain is: **Dish -> Components -> Recipe -> Inventory/Stock -> Ordering -> Supplier**. All new features or modifications must respect and maintain this workflow.
 
 8.  **Current Project Notes & Open Tasks**
-    The following are the current items on our to-do list:
-    *   **Re-implement Automated Supplier Emails:**
-        *   Create a new Cloud Function that triggers when a new order is created.
-        *   The function should use `nodemailer` to send an email to the relevant supplier.
-        *   The email should contain the list of items to be ordered.
+    *   Continue building out the admin dashboard functionality.

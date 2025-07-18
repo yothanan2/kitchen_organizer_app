@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 
+import 'package:kitchen_organizer_app/controllers/mise_en_place_controller.dart';
+import 'package:kitchen_organizer_app/widgets/component_details_widget.dart';
+
 class MiseEnPlaceScreen extends ConsumerStatefulWidget {
   const MiseEnPlaceScreen({super.key});
 
@@ -15,27 +18,20 @@ class MiseEnPlaceScreen extends ConsumerStatefulWidget {
 class _MiseEnPlaceScreenState extends ConsumerState<MiseEnPlaceScreen> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
 
-  Future<void> _toggleTaskCompletion(DocumentReference taskRef, bool currentStatus) async {
-    try {
-      if (!currentStatus) {
-        await taskRef.update({
-          'isCompleted': true,
-          'completedByUid': currentUser?.uid,
-          'completedByName': currentUser?.displayName ?? currentUser?.email,
-          'completedOn': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await taskRef.update({
-          'isCompleted': false,
-          'completedByUid': FieldValue.delete(),
-          'completedByName': FieldValue.delete(),
-          'completedOn': FieldValue.delete(),
-        });
-      }
-    } catch (e) {
+  Future<void> _toggleTaskCompletion(DocumentReference taskRef, bool currentStatus, DocumentReference? componentRef) async {
+    final controller = ref.read(miseEnPlaceControllerProvider);
+    final errorMessage = await controller.toggleTaskCompletion(
+      taskRef,
+      currentStatus,
+      componentRef,
+      currentUser?.uid,
+      currentUser?.displayName ?? currentUser?.email,
+    );
+
+    if (errorMessage != null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating task: ${e.toString()}')),
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
       );
     }
   }
@@ -94,10 +90,11 @@ class _MiseEnPlaceScreenState extends ConsumerState<MiseEnPlaceScreen> {
               final taskName = data?['taskName'] as String? ?? 'Unnamed Task';
               final dishName = data?['dishName'] as String?;
               final isCompleted = data?['isCompleted'] as bool? ?? false;
+              final componentRef = data?['componentRef'] as DocumentReference?;
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                child: ListTile(
+                child: ExpansionTile(
                   title: Text(
                     taskName,
                     style: TextStyle(
@@ -110,13 +107,22 @@ class _MiseEnPlaceScreenState extends ConsumerState<MiseEnPlaceScreen> {
                   leading: Checkbox(
                     value: isCompleted,
                     onChanged: (bool? value) {
-                      _toggleTaskCompletion(taskDocument.reference, isCompleted);
+                      _toggleTaskCompletion(taskDocument.reference, isCompleted, componentRef);
                     },
                     activeColor: Colors.green,
                   ),
-                  onTap: () {
-                    _toggleTaskCompletion(taskDocument.reference, isCompleted);
-                  },
+                  children: [
+                    if (componentRef != null)
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: ComponentDetailsWidget(componentRef: componentRef),
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text("No component linked to this task."),
+                      )
+                  ],
                 ),
               );
             },
