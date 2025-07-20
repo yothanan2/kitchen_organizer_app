@@ -1,37 +1,28 @@
-# Flutter
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
+# Flutter/Dart
 .dart_tool/
+.packages
+.pub-cache/
 build/
-web/
-# IDE
+
+# IDE files (VSCode, Android Studio, etc.)
 .idea/
+.vscode/
 *.iml
-# Other
-C:\android\kitchen_organizer_app\ss
-/android/local.properties
-/ios/Flutter/App.framework
-/ios/Flutter/engine.version
-/ios/Flutter/flutter_assets/
-/ios/Flutter/flutter_build.d
-/ios/Flutter/Generated.xcconfig
-/ios/Flutter/Info.plist
-/ios/Flutter/pod_build.d
-/ios/Runner/Assets.xcassets/
-/ios/Runner/GeneratedPluginRegistrant.h
-/ios/Runner/GeneratedPluginRegistrant.m
-/ios/Runner/Info.plist
-/ios/Runner.xcodeproj/project.xcworkspace/
-/ios/Runner.xcodeproj/xcshareddata/
-/ios/Runner.xcworkspace/
-/windows/flutter/generated_plugins.cmake
-/windows/runner/Debug/
-/windows/runner/Release/
-/windows/runner/win32_headers/
-/linux/flutter/generated_plugins.cmake
-/macos/Flutter/GeneratedPluginRegistrant.swift
+*.ipr
+*.iws
+
+# Sensitive and auto-generated files
 lib/firebase_options.dart
+/android/local.properties
 .env
-# Ignore the screenshots folder
+
+# Custom folders to ignore
+# This will ignore your screenshots folder
 /ss/
+
+# Other standard ignores
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
