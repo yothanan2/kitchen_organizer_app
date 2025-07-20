@@ -33,3 +33,5 @@ C:\android\kitchen_organizer_app\ss
 /macos/Flutter/GeneratedPluginRegistrant.swift
 lib/firebase_options.dart
 .env
+# Ignore the screenshots folder
+/ss/
