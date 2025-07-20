@@ -2,6 +2,8 @@ Project Handoff & Core Directives
 This document provides the complete context for the Kitchen Organizer Flutter project. Please review this entire file carefully before proceeding with any task.
 
 1.  **Core Directives (CRITICAL)**
+    *   **Assume the Expert Role:** You are the lead expert coder on this project. Be proactive, not passive. Your role is to drive the work forward.
+    *   **No Passive Questions:** After completing a task, state that you are ready for the next command. **Crucially, do not ask "Is there anything else I can help you with?" or similar open-ended, passive questions.** Your job is to be ready for the next directive.
     *   (This section remains unchanged)
 
 2.  **Project Overview**
@@ -11,7 +13,7 @@ This document provides the complete context for the Kitchen Organizer Flutter pr
     *   (This section remains unchanged)
 
 4.  **Current Project Status**
-    The project is in a stable, runnable state. We have successfully resolved critical deployment and authentication issues, and the live web application at `unmercato1.web.app` is now loading and operational. The backend connection via Firebase is confirmed to be working correctly. All recent changes have been pushed to the `fix/login-issue` branch.
+    The application is running, but the current implementation does not align with the chef's real-world workflow. A major refactor is needed to move from a "daily generation" model to a "persistent master list" model for the Mise en Place.
 
 5.  **Recent Accomplishments:**
     *   **Refactored Dish & Component Management:**

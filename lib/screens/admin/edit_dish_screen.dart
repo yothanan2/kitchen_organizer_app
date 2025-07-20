@@ -29,6 +29,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
   final _dishNameController = TextEditingController();
   final _recipeInstructionsController = TextEditingController();
   final _notesController = TextEditingController();
+  final _defaultQuantityController = TextEditingController();
 
   @override
   void initState() {
@@ -42,6 +43,9 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
           if (_dishNameController.text != dish.dishName) _dishNameController.text = dish.dishName;
           if (_recipeInstructionsController.text != dish.recipeInstructions) _recipeInstructionsController.text = dish.recipeInstructions;
           if (_notesController.text != dish.notes) _notesController.text = dish.notes;
+          if (dish.defaultPlannedQuantity != null) {
+            _defaultQuantityController.text = dish.defaultPlannedQuantity.toString();
+          }
         }
       },
       fireImmediately: true,
@@ -53,6 +57,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
     _dishNameController.dispose();
     _recipeInstructionsController.dispose();
     _notesController.dispose();
+    _defaultQuantityController.dispose();
     super.dispose();
   }
 
@@ -97,11 +102,29 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
     );
 
     if (newComponent != null) {
+      final componentData = newComponent.data() as Map<String, dynamic>;
+      final unitRef = componentData['defaultUnitRef'] as DocumentReference?;
+      String? unitName;
+
+      // Fetch the unit name from the reference
+      if (unitRef != null) {
+        try {
+          final unitDoc = await unitRef.get();
+          if (unitDoc.exists) {
+            unitName = (unitDoc.data() as Map<String, dynamic>)['name'];
+          }
+        } catch (e) {
+          debugPrint("Error fetching unit name: $e");
+        }
+      }
+
       final newTask = PrepTask(
-        id: '', // Firestore will generate
-        taskName: (newComponent.data() as Map<String, dynamic>)['dishName'],
+        id: newComponent.id,
+        taskName: componentData['dishName'] ?? 'Unnamed Component',
         linkedDishRef: newComponent.reference,
-        order: 0, // Controller will handle order
+        order: 0, // Controller will handle reordering
+        plannedQuantity: (componentData['defaultPlannedQuantity'] as num?) ?? 1, // Default to 1 if null
+        unit: unitName,
       );
       ref.read(editDishControllerProvider((dish: widget.dish, isCreatingComponent: widget.isCreatingComponent)).notifier).addPrepTask(newTask);
     }
@@ -236,6 +259,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                       dishName: _dishNameController.text,
                       instructions: _recipeInstructionsController.text,
                       notes: _notesController.text,
+                      defaultPlannedQuantity: num.tryParse(_defaultQuantityController.text),
                     );
 
                     final error = await controller.saveDish();
@@ -302,6 +326,50 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                       ),
                   ],
                   if (isComponent) ...[
+                    const SizedBox(height: 16),
+                    Text("Default Prep Amount", style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _defaultQuantityController,
+                            decoration: const InputDecoration(labelText: "Default Quantity", border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v != null && v.isNotEmpty && num.tryParse(v) == null) {
+                                return "Must be a valid number";
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Consumer(builder: (context, ref, child) {
+                            final unitsAsync = ref.watch(unitsStreamProvider);
+                            return unitsAsync.when(
+                              loading: () => const Center(child: CircularProgressIndicator()),
+                              error: (err, stack) => Text('Error: $err'),
+                              data: (unitsSnapshot) {
+                                return DropdownButtonFormField<DocumentReference>(
+                                  value: dish.defaultUnitRef,
+                                  decoration: const InputDecoration(labelText: "Unit", border: OutlineInputBorder()),
+                                  items: unitsSnapshot.docs.map((doc) {
+                                    return DropdownMenuItem<DocumentReference>(
+                                      value: doc.reference,
+                                      child: Text((doc.data() as Map<String, dynamic>)['name']),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) => controller.updateDetails(defaultUnitRef: value),
+                                );
+                              },
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

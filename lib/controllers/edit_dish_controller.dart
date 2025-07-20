@@ -81,6 +81,8 @@ class EditDishController extends StateNotifier<EditDishState> {
     String? notes,
     bool? isActive,
     bool? isComponent,
+    num? defaultPlannedQuantity,
+    DocumentReference? defaultUnitRef,
   }) {
     state.dish.whenData((dish) {
       state = state.copyWith(
@@ -91,6 +93,8 @@ class EditDishController extends StateNotifier<EditDishState> {
             notes: notes,
             isActive: isActive,
             isComponent: isComponent,
+            defaultPlannedQuantity: defaultPlannedQuantity,
+            defaultUnitRef: defaultUnitRef,
           ),
         ),
       );
@@ -170,24 +174,6 @@ class EditDishController extends StateNotifier<EditDishState> {
 
       final dishData = dishToSave.toFirestore();
 
-      // If it's a dish (not a component), we only save a limited set of fields.
-      if (!dishToSave.isComponent) {
-        final simplifiedData = {
-          'dishName': dishData['dishName'],
-          'isActive': dishData['isActive'],
-          'isComponent': false,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        };
-        if (dishToSave.id.isEmpty) {
-          await collection.add(simplifiedData);
-        } else {
-          await collection.doc(dishToSave.id).update(simplifiedData);
-        }
-        state = state.copyWith(isSaving: false);
-        return null; // Early return for simple dishes
-      }
-
-      // Full logic for components (with sub-collections)
       if (dishToSave.id.isEmpty) {
         docRef = await collection.add(dishData);
       } else {
@@ -195,25 +181,33 @@ class EditDishController extends StateNotifier<EditDishState> {
         await docRef.update(dishData);
       }
 
-      final batch = firestore.batch();
+      // Sub-collection logic is only for components
+      if (dishToSave.isComponent) {
+        final batch = firestore.batch();
 
-      final ingredientsSnapshot = await docRef.collection('ingredients').get();
-      for (final doc in ingredientsSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      for (final ingredient in dishToSave.ingredients) {
-        batch.set(docRef.collection('ingredients').doc(), ingredient.toFirestore());
-      }
+        final ingredientsSnapshot = await docRef.collection('ingredients').get();
+        for (final doc in ingredientsSnapshot.docs) {
+          batch.delete(doc.reference);
+        }
+        for (final ingredient in dishToSave.ingredients) {
+          batch.set(docRef.collection('ingredients').doc(), ingredient.toFirestore());
+        }
 
-      final prepTasksSnapshot = await docRef.collection('prepTasks').get();
-      for (final doc in prepTasksSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      for (final task in dishToSave.prepTasks) {
-        batch.set(docRef.collection('prepTasks').doc(), task.toFirestore());
+        await batch.commit();
       }
 
-      await batch.commit();
+      // This part is for regular dishes that have components (prep tasks)
+      if (!dishToSave.isComponent) {
+        final batch = firestore.batch();
+        final prepTasksSnapshot = await docRef.collection('prepTasks').get();
+        for (final doc in prepTasksSnapshot.docs) {
+          batch.delete(doc.reference);
+        }
+        for (final task in dishToSave.prepTasks) {
+          batch.set(docRef.collection('prepTasks').doc(), task.toFirestore());
+        }
+        await batch.commit();
+      }
 
       state = state.copyWith(isSaving: false);
       return null; // Success

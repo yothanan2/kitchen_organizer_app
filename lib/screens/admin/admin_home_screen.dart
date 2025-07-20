@@ -10,7 +10,10 @@ import 'package:kitchen_organizer_app/providers.dart';
 import 'package:kitchen_organizer_app/screens/admin/user_management_screen.dart';
 import 'package:kitchen_organizer_app/screens/admin/analytics_screen.dart';
 import 'package:kitchen_organizer_app/screens/admin/system_management_screen.dart';
-import 'package:kitchen_organizer_app/screens/admin/daily_notes_history_screen.dart'; // <-- NEW IMPORT
+import 'package:kitchen_organizer_app/screens/admin/mise_en_place_management_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/daily_notes_history_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/daily_ordering_screen.dart';
+import 'package:kitchen_organizer_app/screens/admin/receiving_station_screen.dart';
 import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
 
 class AdminHomeScreen extends ConsumerWidget {
@@ -57,6 +60,29 @@ class AdminHomeScreen extends ConsumerWidget {
             const _DailyInfoCard(),
             const SizedBox(height: 24),
 
+            _buildMenuButtonWithBadge(
+              context,
+              title: 'Daily Orders',
+              icon: Icons.shopping_cart_outlined,
+              asyncValue: ref.watch(pendingSuggestionsCountProvider),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const DailyOrderingScreen())),
+            ),
+            const SizedBox(height: 12),
+            _buildMenuButtonWithBadge(
+              context,
+              title: 'Receiving Station',
+              icon: Icons.inventory_2_outlined,
+              asyncValue: ref.watch(orderedSuggestionsCountProvider),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ReceivingStationScreen())),
+            ),
+            const SizedBox(height: 12),
+            _buildMenuButton(
+              context,
+              title: 'Mise en Place Management',
+              icon: Icons.restaurant_menu_outlined,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const MiseEnPlaceManagementScreen())),
+            ),
+            const SizedBox(height: 12),
             _buildMenuButton(
               context,
               title: 'Manage Users',
@@ -93,6 +119,41 @@ class AdminHomeScreen extends ConsumerWidget {
         textStyle: Theme.of(context).textTheme.labelLarge,
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 20),
+      ),
+    );
+  }
+
+  Widget _buildMenuButtonWithBadge(BuildContext context, {required String title, required IconData icon, required AsyncValue<int> asyncValue, required VoidCallback onTap}) {
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 60),
+        textStyle: Theme.of(context).textTheme.labelLarge,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+      ),
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 16),
+          Text(title),
+          const Spacer(),
+          asyncValue.when(
+            loading: () => const SizedBox.shrink(),
+            error: (err, stack) => const Icon(Icons.error_outline, color: Colors.red),
+            data: (count) {
+              if (count == 0) return const SizedBox.shrink();
+              return CircleAvatar(
+                radius: 12,
+                backgroundColor: Theme.of(context).primaryColor,
+                child: Text(
+                  count.toString(),
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

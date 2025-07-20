@@ -101,24 +101,80 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> {
                                   final taskName = taskData['taskName'] ?? 'Unnamed Task';
                                   final isSelected = prepState.selectedTasks[taskId] ?? false;
                                   final taskNote = prepState.taskNotes[taskId] ?? '';
+                                  final quantityController = prepState.quantityControllers[taskId];
+                                  final selectedUnit = prepState.selectedUnits[taskId];
 
-                                  return ListTile(
-                                    title: Text(taskName),
-                                    leading: Checkbox(
-                                      value: isSelected,
-                                      onChanged: (bool? newValue) {
-                                        prepController.toggleTask(taskId, newValue ?? false);
-                                      },
-                                    ),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.notes),
-                                      onPressed: () async {
-                                        final note = await _showNoteDialog(context, taskNote);
-                                        if (note != null) {
-                                          prepController.updateNote(taskId, note);
-                                        }
-                                      },
-                                    ),
+                                  return Column(
+                                    children: [
+                                      ListTile(
+                                        title: Text(taskName),
+                                        leading: Checkbox(
+                                          value: isSelected,
+                                          onChanged: (bool? newValue) {
+                                            prepController.toggleTask(taskId, newValue ?? false);
+                                          },
+                                        ),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.notes),
+                                          onPressed: () async {
+                                            final note = await _showNoteDialog(context, taskNote);
+                                            if (note != null) {
+                                              prepController.updateNote(taskId, note);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                flex: 2,
+                                                child: TextField(
+                                                  controller: quantityController,
+                                                  decoration: const InputDecoration(
+                                                    labelText: 'Quantity',
+                                                    border: OutlineInputBorder(),
+                                                  ),
+                                                  keyboardType: TextInputType.number,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                flex: 3,
+                                                child: Consumer(
+                                                  builder: (context, ref, child) {
+                                                    final unitsAsync = ref.watch(unitsStreamProvider);
+                                                    return unitsAsync.when(
+                                                      loading: () => const CircularProgressIndicator(),
+                                                      error: (err, stack) => Text('Error: $err'),
+                                                      data: (unitsSnapshot) {
+                                                        return DropdownButtonFormField<String>(
+                                                          value: selectedUnit,
+                                                          decoration: const InputDecoration(
+                                                            labelText: 'Unit',
+                                                            border: OutlineInputBorder(),
+                                                          ),
+                                                          items: unitsSnapshot.docs.map((doc) {
+                                                            return DropdownMenuItem<String>(
+                                                              value: doc.id,
+                                                              child: Text((doc.data() as Map<String, dynamic>)['name']),
+                                                            );
+                                                          }).toList(),
+                                                          onChanged: (value) {
+                                                            prepController.updateUnit(taskId, value);
+                                                          },
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
                                   );
                                 }).toList(),
                               );

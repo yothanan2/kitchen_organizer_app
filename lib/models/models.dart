@@ -140,6 +140,9 @@ class Dish {
   final DateTime? lastUpdated;
   final List<Ingredient> ingredients;
   final List<PrepTask> prepTasks;
+  // New fields for components
+  final num? defaultPlannedQuantity;
+  final DocumentReference? defaultUnitRef;
 
   Dish({
     required this.id,
@@ -151,6 +154,8 @@ class Dish {
     this.lastUpdated,
     this.ingredients = const [],
     this.prepTasks = const [],
+    this.defaultPlannedQuantity,
+    this.defaultUnitRef,
   });
 
   factory Dish.empty({bool isComponent = false}) {
@@ -174,6 +179,8 @@ class Dish {
     DateTime? lastUpdated,
     List<Ingredient>? ingredients,
     List<PrepTask>? prepTasks,
+    num? defaultPlannedQuantity,
+    DocumentReference? defaultUnitRef,
   }) {
     return Dish(
       id: id ?? this.id,
@@ -185,6 +192,8 @@ class Dish {
       lastUpdated: lastUpdated ?? this.lastUpdated,
       ingredients: ingredients ?? this.ingredients,
       prepTasks: prepTasks ?? this.prepTasks,
+      defaultPlannedQuantity: defaultPlannedQuantity ?? this.defaultPlannedQuantity,
+      defaultUnitRef: defaultUnitRef ?? this.defaultUnitRef,
     );
   }
 
@@ -197,6 +206,8 @@ class Dish {
       isComponent: data['isComponent'] ?? false,
       notes: data['notes'] ?? '',
       lastUpdated: (data['lastUpdated'] as Timestamp?)?.toDate(),
+      defaultPlannedQuantity: data['defaultPlannedQuantity'],
+      defaultUnitRef: data['defaultUnitRef'],
     );
   }
 
@@ -208,6 +219,8 @@ class Dish {
       'isComponent': isComponent,
       'notes': notes,
       'lastUpdated': FieldValue.serverTimestamp(),
+      'defaultPlannedQuantity': defaultPlannedQuantity,
+      'defaultUnitRef': defaultUnitRef,
     };
   }
 }
@@ -252,12 +265,24 @@ class PrepTask {
   final String taskName;
   final DocumentReference? linkedDishRef;
   final int order;
+  final num plannedQuantity;
+  final num completedQuantity;
+  final String? unit; // e.g., "Liters", "KG", "Portions"
+  final bool isCompleted;
+  final String? completedBy;
+  final DateTime? completedAt;
 
   PrepTask({
     required this.id,
     required this.taskName,
     this.linkedDishRef,
     required this.order,
+    this.plannedQuantity = 0,
+    this.completedQuantity = 0,
+    this.unit,
+    this.isCompleted = false,
+    this.completedBy,
+    this.completedAt,
   });
 
   PrepTask copyWith({
@@ -265,21 +290,36 @@ class PrepTask {
     String? taskName,
     DocumentReference? linkedDishRef,
     int? order,
+    num? plannedQuantity,
+    num? completedQuantity,
+    String? unit,
+    bool? isCompleted,
+    String? completedBy,
+    DateTime? completedAt,
   }) {
     return PrepTask(
       id: id ?? this.id,
       taskName: taskName ?? this.taskName,
       linkedDishRef: linkedDishRef ?? this.linkedDishRef,
       order: order ?? this.order,
+      plannedQuantity: plannedQuantity ?? this.plannedQuantity,
+      completedQuantity: completedQuantity ?? this.completedQuantity,
+      unit: unit ?? this.unit,
+      isCompleted: isCompleted ?? this.isCompleted,
+      completedBy: completedBy ?? this.completedBy,
+      completedAt: completedAt ?? this.completedAt,
     );
   }
 
   factory PrepTask.fromFirestore(Map<String, dynamic> data, String id) {
     return PrepTask(
       id: id,
-      taskName: data['taskName'] ?? 'Unnamed Task',
+      taskName: data['taskName'] ?? data['name'] ?? 'Unnamed Task', // Added 'name' for components
       linkedDishRef: data['linkedDishRef'],
       order: data['order'] ?? 0,
+      plannedQuantity: data['plannedQuantity'] ?? 0,
+      completedQuantity: data['completedQuantity'] ?? 0,
+      unit: data['unit'],
     );
   }
 
@@ -288,6 +328,9 @@ class PrepTask {
       'taskName': taskName,
       'linkedDishRef': linkedDishRef,
       'order': order,
+      'plannedQuantity': plannedQuantity,
+      'completedQuantity': completedQuantity,
+      'unit': unit,
     };
   }
 }

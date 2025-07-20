@@ -1,9 +1,8 @@
-// lib/screens/kitchen/kitchen_dashboard_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kitchen_organizer_app/screens/admin/admin_home_screen.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/staff_home_screen.dart';
+import 'package:kitchen_organizer_app/screens/kitchen/mise_en_place_screen.dart';
 import 'package:kitchen_organizer_app/providers.dart';
 
 class KitchenDashboardScreen extends ConsumerWidget {
@@ -20,7 +19,7 @@ class KitchenDashboardScreen extends ConsumerWidget {
 
     Widget currentScreen;
     if (appUser.role == 'Kitchen Staff') {
-      currentScreen = const StaffHomeScreen();
+      currentScreen = const MiseEnPlaceScreen();
     } else if (appUser.role == 'Admin') {
       if (isViewingAsStaff) {
         currentScreen = const StaffHomeScreen();
