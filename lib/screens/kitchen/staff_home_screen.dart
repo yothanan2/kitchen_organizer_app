@@ -11,7 +11,6 @@ import 'package:kitchen_organizer_app/widgets/weather_card_widget.dart';
 import 'package:kitchen_organizer_app/widgets/daily_note_card_widget.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/kitchen_requisition_screen.dart' as k_req_screen;
 import 'package:kitchen_organizer_app/screens/kitchen/staff_low_stock_screen.dart';
-import 'package:kitchen_organizer_app/screens/kitchen/todays_prep_screen.dart';
 import 'package:kitchen_organizer_app/screens/kitchen/mise_en_place_screen.dart';
 
 
@@ -51,12 +50,7 @@ class _StaffHomeScreenState extends ConsumerState<StaffHomeScreen> {
                   asyncValue: ref.watch(prepTasksCountProvider(selectedDateString)), // This count might need adjustment later
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const MiseEnPlaceScreen())),
                 ),
-                _buildMetricCard(
-                  title: "Today's Preps",
-                  icon: Icons.kitchen_outlined,
-                  asyncValue: ref.watch(flaggedTasksForTodayCountProvider),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const TodaysPrepScreen())),
-                ),
+                
                 _buildMetricCard(
                   title: 'Open Requisitions',
                   icon: Icons.assignment_turned_in_outlined,

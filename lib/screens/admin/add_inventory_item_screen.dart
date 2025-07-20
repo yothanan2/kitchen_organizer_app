@@ -23,6 +23,7 @@ class _AddInventoryItemScreenState
   final _itemCodeController = TextEditingController();
   final _parLevelController = TextEditingController();
   final _minStockController = TextEditingController();
+  final _quantityOnHandController = TextEditingController();
 
   String? _selectedCategoryId;
   String? _selectedSupplierId;
@@ -46,6 +47,7 @@ class _AddInventoryItemScreenState
         _itemCodeController.text = item.itemCode ?? '';
         _parLevelController.text = item.parLevel.toString();
         _minStockController.text = item.minStockLevel.toString();
+        _quantityOnHandController.text = item.quantityOnHand.toString();
         setState(() {
           _selectedCategoryId = item.category?.id;
           _selectedSupplierId = item.supplier?.id;
@@ -65,6 +67,7 @@ class _AddInventoryItemScreenState
     _itemCodeController.dispose();
     _parLevelController.dispose();
     _minStockController.dispose();
+    _quantityOnHandController.dispose();
     super.dispose();
   }
 
@@ -90,6 +93,7 @@ class _AddInventoryItemScreenState
             : null,
         'parLevel': num.tryParse(_parLevelController.text) ?? 0,
         'minStockLevel': num.tryParse(_minStockController.text) ?? 0,
+        'quantityOnHand': num.tryParse(_quantityOnHandController.text) ?? 0,
         'isButcherItem': isButcherItem,
       };
 
@@ -218,6 +222,24 @@ class _AddInventoryItemScreenState
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _quantityOnHandController,
+                decoration: const InputDecoration(
+                  labelText: 'Quantity on Hand',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter the current quantity';
+                  }
+                  if (num.tryParse(value) == null) {
+                    return 'Please enter a valid number';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               SwitchListTile(

@@ -49,58 +49,7 @@ final flaggedTasksForTodayCountProvider = StreamProvider.autoDispose<int>((ref) 
       .map((snapshot) => snapshot.docs.length);
 });
 
-final todaysPrepsProvider = FutureProvider.autoDispose<List<Dish>>((ref) async {
-  final firestore = ref.watch(firestoreProvider);
-  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-  // 1. Get all tasks from both sources.
-  final flaggedTasksSnapshot = await firestore.collection('nextDayTasks').doc(today).collection('tasks').get();
-  final dailyTasksSnapshot = await firestore.collection('dailyTodoLists').doc(today).collection('prepTasks').get();
-
-  if (flaggedTasksSnapshot.docs.isEmpty && dailyTasksSnapshot.docs.isEmpty) {
-    return [];
-  }
-
-  final allTaskDocs = [...flaggedTasksSnapshot.docs, ...dailyTasksSnapshot.docs];
-  
-  // Deduplicate tasks based on ID. A flagged task might also be generated.
-  final uniqueTaskDocs = { for (var doc in allTaskDocs) doc.id : doc }.values.toList();
-
-  final tasks = uniqueTaskDocs.map((doc) => PrepTask.fromFirestore(doc.data(), doc.id)).toList();
-
-  // 2. Group tasks by their parent dish reference.
-  final tasksByDish = groupBy<PrepTask, DocumentReference?>(tasks, (task) => task.linkedDishRef);
-
-  // 3. Fetch the dish info for each group and build the final list.
-  final List<Dish> dishesWithTasks = [];
-  for (final entry in tasksByDish.entries) {
-    final dishRef = entry.key;
-    final tasksForThisDish = entry.value;
-
-    if (dishRef != null) {
-      final dishDoc = await dishRef.get();
-      if (dishDoc.exists) {
-        final dish = Dish.fromFirestore(dishDoc.data() as Map<String, dynamic>, dishDoc.id);
-        dishesWithTasks.add(dish.copyWith(prepTasks: tasksForThisDish));
-      }
-    }
-  }
-
-  return dishesWithTasks;
-});
-
-final todaysPrepsCountProvider = StreamProvider.autoDispose<int>((ref) {
-  final firestore = ref.watch(firestoreProvider);
-  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-  final flaggedStream = firestore.collection('nextDayTasks').doc(today).collection('tasks').where('isCompleted', isEqualTo: false).snapshots();
-  final dailyStream = firestore.collection('dailyTodoLists').doc(today).collection('prepTasks').where('isCompleted', isEqualTo: false).snapshots();
-
-  return Rx.combineLatest2(flaggedStream, dailyStream, (QuerySnapshot flagged, QuerySnapshot daily) {
-    final allIds = {...flagged.docs.map((d) => d.id), ...daily.docs.map((d) => d.id)};
-    return allIds.length;
-  });
-});
 
 // ==== Auth-Related Providers ====
 @immutable
@@ -419,7 +368,7 @@ class ItemFormController extends StateNotifier<ItemFormState> {
       if (existingDocId != null && existingDocId.isNotEmpty) {
         await firestore.collection('inventoryItems').doc(existingDocId).update(fullData);
       } else {
-        await firestore.collection('inventoryItems').add({...fullData, 'quantityOnHand': 0});
+        await firestore.collection('inventoryItems').add(fullData);
       }
       state = state.copyWith(isLoading: false);
       return null;
@@ -638,7 +587,8 @@ final masterMiseEnPlaceProvider = StreamProvider.autoDispose<List<PrepTask>>((re
   final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
   final componentsStream = firestore
-      .collection('components')
+      .collection('dishes')
+      .where('isComponent', isEqualTo: true)
       .where('isGloballyActive', isEqualTo: true)
       .snapshots();
 
@@ -813,7 +763,11 @@ final requisitionHistoryProvider = StreamProvider.autoDispose<List<Requisition>>
 
 // Provider to fetch all components for the management screen
 final allComponentsStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) {
-  return ref.watch(firestoreProvider).collection('components').orderBy('name').snapshots();
+  return ref.watch(firestoreProvider)
+      .collection('dishes')
+      .where('isComponent', isEqualTo: true)
+      .orderBy('dishName')
+      .snapshots();
 });
 
 // NEW ENUM for the bell status

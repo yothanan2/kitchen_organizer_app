@@ -314,7 +314,7 @@ class PrepTask {
   factory PrepTask.fromFirestore(Map<String, dynamic> data, String id) {
     return PrepTask(
       id: id,
-      taskName: data['taskName'] ?? data['name'] ?? 'Unnamed Task', // Added 'name' for components
+      taskName: data['taskName'] ?? data['name'] ?? data['dishName'] ?? 'Unnamed Task', // Added 'name' for components
       linkedDishRef: data['linkedDishRef'],
       order: data['order'] ?? 0,
       plannedQuantity: data['plannedQuantity'] ?? 0,

@@ -72,8 +72,8 @@ class _MiseEnPlaceManagementScreenState extends ConsumerState<MiseEnPlaceManagem
 
   Widget _buildComponentListItem(DocumentSnapshot componentDoc) {
     final data = componentDoc.data() as Map<String, dynamic>;
-    final String name = data['name'] ?? 'Unnamed Component';
-    final bool isGloballyActive = data['isGloballyActive'] ?? true; // Default to active
+    final String name = data['dishName'] ?? 'Unnamed Dish';
+    final bool isGloballyActive = data['isGloballyActive'] ?? false; // Default to inactive
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -83,7 +83,7 @@ class _MiseEnPlaceManagementScreenState extends ConsumerState<MiseEnPlaceManagem
           value: isGloballyActive,
           onChanged: (bool newValue) {
             FirebaseFirestore.instance
-                .collection('components')
+                .collection('dishes') // Corrected collection
                 .doc(componentDoc.id)
                 .update({'isGloballyActive': newValue});
           },

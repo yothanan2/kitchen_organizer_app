@@ -286,6 +286,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                     controller: _dishNameController,
                     decoration: InputDecoration(labelText: isComponent ? "Component Name" : "Dish Name"),
                     validator: (v) => (v == null || v.isEmpty) ? "Please enter a name" : null,
+                    onChanged: (value) => controller.updateDetails(dishName: value),
                   ),
                   if (!isComponent) ...[
                     const SizedBox(height: 16),
@@ -401,6 +402,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                       controller: _recipeInstructionsController,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
                       maxLines: 10,
+                      onChanged: (value) => controller.updateDetails(instructions: value),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -410,6 +412,7 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                     controller: _notesController,
                     decoration: const InputDecoration(border: OutlineInputBorder()),
                     maxLines: 5,
+                    onChanged: (value) => controller.updateDetails(notes: value),
                   ),
                 ],
               ),

@@ -141,19 +141,21 @@ class _InventoryFilteredList extends ConsumerWidget {
                               const Icon(Icons.location_on, size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
                               Expanded(
-                                child: DropdownButton<String>(
-                                  value: currentLocationId,
-                                  hint: const Text("Assign Location"),
-                                  items: locationDropdownItems,
-                                  onChanged: (newLocationId) async {
-                                    if (newLocationId != null) {
-                                      final itemRef = document.reference;
-                                      final newLocationRef = FirebaseFirestore.instance.collection('locations').doc(newLocationId);
-                                      await itemRef.update({'location': newLocationRef});
-                                    }
-                                  },
-                                  isDense: true,
-                                  underline: const SizedBox.shrink(),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: currentLocationId,
+                                    hint: const Text("Assign Location"),
+                                    items: locationDropdownItems,
+                                    onChanged: (newLocationId) async {
+                                      if (newLocationId != null) {
+                                        final itemRef = document.reference;
+                                        final newLocationRef = FirebaseFirestore.instance.collection('locations').doc(newLocationId);
+                                        await itemRef.update({'location': newLocationRef});
+                                      }
+                                    },
+                                    isDense: true,
+                                    isExpanded: true, // Ensures the dropdown fills the expanded space
+                                  ),
                                 ),
                               ),
                             ],
