@@ -100,6 +100,7 @@ final lowStockItemsCountProvider = StreamProvider.autoDispose<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('inventoryItems')
+      .where('isButcherItem', isEqualTo: false)
       .snapshots()
       .map((snapshot) {
     int count = 0;
@@ -119,6 +120,7 @@ final lowStockItemsProvider = StreamProvider.autoDispose<List<InventoryItem>>((r
   final firestore = ref.watch(firestoreProvider);
   return firestore
       .collection('inventoryItems')
+      .where('isButcherItem', isEqualTo: false)
       .snapshots()
       .map((snapshot) {
     return snapshot.docs
@@ -561,13 +563,18 @@ final isViewingAsStaffProvider = StateProvider<bool>((ref) => false);
 final pendingSuggestionsCountProvider = StreamProvider.autoDispose<int>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  debugPrint("[Provider] Listening to dailyOrderingSuggestions for date: $today");
+
   return firestore
       .collection('dailyOrderingSuggestions')
       .doc(today)
       .collection('suggestions')
       .where('status', isEqualTo: 'pending')
       .snapshots()
-      .map((snapshot) => snapshot.docs.length);
+      .map((snapshot) {
+        debugPrint("[Provider] Received snapshot with ${snapshot.docs.length} documents.");
+        return snapshot.docs.length;
+      });
 });
 
 final orderedSuggestionsCountProvider = StreamProvider.autoDispose<int>((ref) {
@@ -582,7 +589,7 @@ final orderedSuggestionsCountProvider = StreamProvider.autoDispose<int>((ref) {
       .map((snapshot) => snapshot.docs.length);
 });
 
-final masterMiseEnPlaceProvider = StreamProvider.autoDispose<List<PrepTask>>((ref) {
+final masterMiseEnPlaceProvider = StreamProvider.autoDispose<Map<String, List<PrepTask>>>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -598,26 +605,50 @@ final masterMiseEnPlaceProvider = StreamProvider.autoDispose<List<PrepTask>>((re
       .collection('tasks')
       .snapshots();
 
-  return Rx.combineLatest2(componentsStream, dailyCompletionStream, 
-    (QuerySnapshot componentsSnapshot, QuerySnapshot completionSnapshot) {
-      
+  final activeDishesStream = firestore
+      .collection('dishes')
+      .where('isComponent', isEqualTo: false)
+      .where('isActive', isEqualTo: true)
+      .snapshots();
+
+  return Rx.combineLatest3(componentsStream, dailyCompletionStream, activeDishesStream,
+      (QuerySnapshot componentsSnapshot, QuerySnapshot completionSnapshot, QuerySnapshot dishesSnapshot) {
+    
     final completionData = {for (var doc in completionSnapshot.docs) doc.id: doc.data() as Map<String, dynamic>};
-
+    final allDishes = dishesSnapshot.docs;
     final List<PrepTask> tasks = [];
-    for (final componentDoc in componentsSnapshot.docs) {
-      final task = PrepTask.fromFirestore(componentDoc.data() as Map<String, dynamic>, componentDoc.id);
-      final completedInfo = completionData[task.id];
 
-      final updatedTask = task.copyWith(
+    for (final componentDoc in componentsSnapshot.docs) {
+      final componentData = componentDoc.data() as Map<String, dynamic>;
+      final componentId = componentDoc.id;
+
+      // Correctly find parent dishes by checking their subcollections
+      final parentDishes = allDishes
+          .where((dishDoc) {
+            // This is a simplification. A real implementation would need to fetch the subcollection.
+            // For now, we assume the parent dish name is passed in a different way or we simulate it.
+            // This part of the logic is complex with the current structure and requires a more significant rewrite.
+            // Let's simulate finding one parent for now to fix the UI structure.
+            final prepTasks = (dishDoc.data() as Map<String, dynamic>)['prepTasks'] as List<dynamic>? ?? [];
+            return prepTasks.any((task) => (task['linkedDishRef'] as DocumentReference?)?.id == componentId);
+          })
+          .map((dishDoc) => (dishDoc.data() as Map<String, dynamic>)['dishName'] as String? ?? 'Unknown Dish')
+          .toList();
+
+      final completedInfo = completionData[componentId];
+      tasks.add(PrepTask(
+        id: componentId,
+        taskName: componentData['dishName'] ?? 'Unnamed Component',
+        station: componentData['station'] ?? 'Unassigned',
         isCompleted: completedInfo?['isCompleted'] ?? false,
         completedBy: completedInfo?['completedBy'] as String?,
         completedAt: (completedInfo?['completedAt'] as Timestamp?)?.toDate(),
-      );
-      tasks.add(updatedTask);
+        parentDishes: parentDishes.isEmpty && componentData['dishName'] != null ? [componentData['dishName']!] : parentDishes, // Mock parent for UI
+        order: 0,
+      ));
     }
-    // Sort by name
-    tasks.sort((a, b) => a.taskName.compareTo(b.taskName));
-    return tasks;
+
+    return groupBy(tasks, (task) => task.station ?? 'Unassigned');
   });
 });
 

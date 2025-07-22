@@ -131,11 +131,13 @@ class _InventoryFilteredList extends ConsumerWidget {
 
                   return Card(
                     color: isLowStock ? Colors.red.shade100 : null,
-                    child: ListTile(
-                      title: Text(itemName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Column(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(itemName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
                               const Icon(Icons.location_on, size: 14, color: Colors.grey),
@@ -154,7 +156,7 @@ class _InventoryFilteredList extends ConsumerWidget {
                                       }
                                     },
                                     isDense: true,
-                                    isExpanded: true, // Ensures the dropdown fills the expanded space
+                                    isExpanded: true,
                                   ),
                                 ),
                               ),
@@ -166,33 +168,47 @@ class _InventoryFilteredList extends ConsumerWidget {
                               const Icon(Icons.category_outlined, size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
                               FirestoreNameWidget(
-                                docRef: item.category, // Use item.category
+                                docRef: item.category,
                                 builder: (context, name) => Text(name),
                               ),
                             ],
                           ),
+                          const Divider(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text("In Stock: ", style: TextStyle(color: Colors.grey)),
+                                  Text(
+                                    '${item.quantityOnHand}',
+                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isLowStock ? Colors.red.shade900 : Colors.black),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  FirestoreNameWidget(
+                                    docRef: item.unit,
+                                    builder: (context, name) => Text(name),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'Edit Item',
+                                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => AddInventoryItemScreen(documentId: document.id))),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    tooltip: 'Delete Item',
+                                    onPressed: () => _showDeleteConfirmation(context, document.reference, itemName),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ],
-                      ),
-                      trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FirestoreNameWidget(
-                              docRef: item.unit, // Use item.unit
-                              builder: (context, name) => Text(name),
-                            ),
-                            const SizedBox(width: 8),
-                            Text('${item.quantityOnHand}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isLowStock ? Colors.red.shade900 : Colors.black)),
-                            IconButton(
-                                icon: const Icon(Icons.edit_outlined),
-                                tooltip: 'Edit Item',
-                                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => AddInventoryItemScreen(documentId: document.id)))
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              tooltip: 'Delete Item',
-                              onPressed: () => _showDeleteConfirmation(context, document.reference, itemName),
-                            ),
-                          ]
                       ),
                     ),
                   );

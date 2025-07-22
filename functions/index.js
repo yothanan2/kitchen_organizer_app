@@ -99,3 +99,60 @@ exports.sendOrderEmail = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', 'Failed to send email.', error);
   }
 });
+
+/**
+ * Triggered when an inventory item is updated.
+ * Checks if the stock has fallen below the minimum level and creates a daily ordering suggestion if so.
+ */
+exports.onInventoryUpdate_createOrderSuggestion = functions.firestore
+    .document("inventoryItems/{itemId}")
+    .onUpdate(async (change, context) => {
+      const newData = change.after.data();
+      const oldData = change.before.data();
+
+      const newQuantity = newData.quantityOnHand || 0;
+      const oldQuantity = oldData.quantityOnHand || 0;
+      const minStock = newData.minStockLevel || 0;
+
+      console.log(`Item: ${newData.itemName}, New Qty: ${newQuantity}, Old Qty: ${oldQuantity}, Min Stock: ${minStock}`);
+
+      // Proceed only if the quantity has actually decreased and crossed the minimum stock threshold
+      if (newQuantity < oldQuantity && newQuantity <= minStock) {
+        console.log("Stock is below minimum, proceeding to create suggestion.");
+        // Check if a suggestion for this item already exists for today to avoid duplicates
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
+        const suggestionRef = admin.firestore().collection("dailyOrderingSuggestions").doc(today).collection("suggestions");
+        
+        const existingSuggestion = await suggestionRef.where("inventoryItemRef", "==", change.after.reference).get();
+
+        if (existingSuggestion.empty) {
+          console.log("No existing suggestion found for this item today.");
+          const parLevel = newData.parLevel || 0;
+          const quantityToOrder = parLevel - newQuantity;
+          console.log(`Par Level: ${parLevel}, Quantity to Order: ${quantityToOrder}`);
+
+          // Ensure we only suggest ordering a positive quantity
+          if (quantityToOrder > 0) {
+            const suggestionData = {
+              inventoryItemRef: change.after.reference,
+              itemName: newData.itemName || "Unknown Item",
+              supplierRef: newData.supplier, // Assuming 'supplier' is a DocumentReference
+              unitRef: newData.unit, // Assuming 'unit' is a DocumentReference
+              quantityToOrder: quantityToOrder,
+              status: "pending", // Initial status
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            
+            console.log("Creating new suggestion:", suggestionData);
+            return suggestionRef.add(suggestionData);
+          } else {
+            console.log("Quantity to order is not positive, skipping suggestion.");
+          }
+        } else {
+          console.log("Suggestion for this item already exists today.");
+        }
+      } else {
+        console.log("Conditions not met for creating a suggestion.");
+      }
+      return null; // No action needed
+    });

@@ -83,6 +83,7 @@ class EditDishController extends StateNotifier<EditDishState> {
     bool? isComponent,
     num? defaultPlannedQuantity,
     DocumentReference? defaultUnitRef,
+    String? station,
   }) {
     state.dish.whenData((dish) {
       state = state.copyWith(
@@ -95,6 +96,7 @@ class EditDishController extends StateNotifier<EditDishState> {
             isComponent: isComponent,
             defaultPlannedQuantity: defaultPlannedQuantity,
             defaultUnitRef: defaultUnitRef,
+            station: station,
           ),
         ),
       );

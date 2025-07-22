@@ -143,6 +143,7 @@ class Dish {
   // New fields for components
   final num? defaultPlannedQuantity;
   final DocumentReference? defaultUnitRef;
+  final String? station;
 
   Dish({
     required this.id,
@@ -156,6 +157,7 @@ class Dish {
     this.prepTasks = const [],
     this.defaultPlannedQuantity,
     this.defaultUnitRef,
+    this.station,
   });
 
   factory Dish.empty({bool isComponent = false}) {
@@ -181,6 +183,7 @@ class Dish {
     List<PrepTask>? prepTasks,
     num? defaultPlannedQuantity,
     DocumentReference? defaultUnitRef,
+    String? station,
   }) {
     return Dish(
       id: id ?? this.id,
@@ -194,6 +197,7 @@ class Dish {
       prepTasks: prepTasks ?? this.prepTasks,
       defaultPlannedQuantity: defaultPlannedQuantity ?? this.defaultPlannedQuantity,
       defaultUnitRef: defaultUnitRef ?? this.defaultUnitRef,
+      station: station ?? this.station,
     );
   }
 
@@ -208,6 +212,7 @@ class Dish {
       lastUpdated: (data['lastUpdated'] as Timestamp?)?.toDate(),
       defaultPlannedQuantity: data['defaultPlannedQuantity'],
       defaultUnitRef: data['defaultUnitRef'],
+      station: data['station'],
     );
   }
 
@@ -221,6 +226,7 @@ class Dish {
       'lastUpdated': FieldValue.serverTimestamp(),
       'defaultPlannedQuantity': defaultPlannedQuantity,
       'defaultUnitRef': defaultUnitRef,
+      'station': station,
     };
   }
 }
@@ -271,6 +277,8 @@ class PrepTask {
   final bool isCompleted;
   final String? completedBy;
   final DateTime? completedAt;
+  final List<String> parentDishes; // For Mise en Place screen
+  final String? station;
 
   PrepTask({
     required this.id,
@@ -283,6 +291,8 @@ class PrepTask {
     this.isCompleted = false,
     this.completedBy,
     this.completedAt,
+    this.parentDishes = const [],
+    this.station,
   });
 
   PrepTask copyWith({
@@ -296,6 +306,8 @@ class PrepTask {
     bool? isCompleted,
     String? completedBy,
     DateTime? completedAt,
+    List<String>? parentDishes,
+    String? station,
   }) {
     return PrepTask(
       id: id ?? this.id,
@@ -308,6 +320,8 @@ class PrepTask {
       isCompleted: isCompleted ?? this.isCompleted,
       completedBy: completedBy ?? this.completedBy,
       completedAt: completedAt ?? this.completedAt,
+      parentDishes: parentDishes ?? this.parentDishes,
+      station: station ?? this.station,
     );
   }
 

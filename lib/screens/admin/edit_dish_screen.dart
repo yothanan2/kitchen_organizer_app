@@ -328,6 +328,21 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
                   ],
                   if (isComponent) ...[
                     const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: dish.station,
+                      decoration: const InputDecoration(
+                        labelText: 'Station',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: ['Front', 'Hot', 'Back'].map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (value) => controller.updateDetails(station: value),
+                    ),
+                    const SizedBox(height: 16),
                     Text("Default Prep Amount", style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Row(
@@ -424,6 +439,6 @@ class _EditDishScreenState extends ConsumerState<EditDishScreen> {
   }
 }
 
-final editDishControllerProvider = StateNotifierProvider.family<EditDishController, EditDishState, ({Dish? dish, bool isCreatingComponent})>((ref, params) {
+final editDishControllerProvider = StateNotifierProvider.autoDispose.family<EditDishController, EditDishState, ({Dish? dish, bool isCreatingComponent})>((ref, params) {
   return EditDishController(ref, params.dish, params.isCreatingComponent);
 });
