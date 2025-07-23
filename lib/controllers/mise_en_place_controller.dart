@@ -46,6 +46,30 @@ class MiseEnPlaceController {
             final newQuantity = currentQuantity + change;
 
             transaction.update(ingredient.inventoryItemRef, {'quantityOnHand': newQuantity});
+
+            // --- START OF FIX ---
+            // After updating, check if the new quantity is below the minimum stock level.
+            final minStockLevel = inventoryItemData['minStockLevel'] ?? 0;
+            if (isCompleted && newQuantity <= minStockLevel) {
+              // If it is, create or update a daily ordering suggestion.
+              final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+              final suggestionRef = _firestore
+                  .collection('dailyOrderingSuggestions')
+                  .doc(today)
+                  .collection('suggestions')
+                  .doc(ingredient.inventoryItemRef.id); // Use item ID as suggestion ID for idempotency
+
+              transaction.set(suggestionRef, {
+                'inventoryItemRef': ingredient.inventoryItemRef,
+                'itemName': inventoryItemData['itemName'] ?? 'Unknown Item',
+                'supplierRef': inventoryItemData['supplier'],
+                'unitRef': inventoryItemData['unit'],
+                'quantityToOrder': ((inventoryItemData['parLevel'] ?? 0) - newQuantity).clamp(0, double.infinity), // Ensure it's not negative
+                'status': 'pending',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+            }
+            // --- END OF FIX ---
           }
         }
 

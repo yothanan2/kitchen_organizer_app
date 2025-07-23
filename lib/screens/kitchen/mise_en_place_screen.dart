@@ -38,9 +38,7 @@ class MiseEnPlaceScreen extends ConsumerWidget {
             );
           }
 
-          final stations = ['Front', 'Hot', 'Back', 'Unassigned']
-              .where((station) => groupedTasks.containsKey(station) && groupedTasks[station]!.isNotEmpty)
-              .toList();
+          final stations = ['Front', 'Hot', 'Back'];
 
           return DefaultTabController(
             length: stations.length,
@@ -56,7 +54,15 @@ class MiseEnPlaceScreen extends ConsumerWidget {
                 Expanded(
                   child: TabBarView(
                     children: stations.map((station) {
-                      final tasks = groupedTasks[station]!;
+                      final tasks = groupedTasks[station] ?? [];
+                      if (tasks.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No prep tasks for the $station station.',
+                            style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        );
+                      }
                       return _TaskList(tasks: tasks);
                     }).toList(),
                   ),

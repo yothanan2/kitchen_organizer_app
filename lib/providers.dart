@@ -593,10 +593,10 @@ final masterMiseEnPlaceProvider = StreamProvider.autoDispose<Map<String, List<Pr
   final firestore = ref.watch(firestoreProvider);
   final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-  final componentsStream = firestore
+  final activeDishesStream = firestore
       .collection('dishes')
-      .where('isComponent', isEqualTo: true)
-      .where('isGloballyActive', isEqualTo: true)
+      .where('isComponent', isEqualTo: false)
+      .where('isActive', isEqualTo: true)
       .snapshots();
 
   final dailyCompletionStream = firestore
@@ -605,51 +605,57 @@ final masterMiseEnPlaceProvider = StreamProvider.autoDispose<Map<String, List<Pr
       .collection('tasks')
       .snapshots();
 
-  final activeDishesStream = firestore
-      .collection('dishes')
-      .where('isComponent', isEqualTo: false)
-      .where('isActive', isEqualTo: true)
-      .snapshots();
-
-  return Rx.combineLatest3(componentsStream, dailyCompletionStream, activeDishesStream,
-      (QuerySnapshot componentsSnapshot, QuerySnapshot completionSnapshot, QuerySnapshot dishesSnapshot) {
+  return Rx.combineLatest2(activeDishesStream, dailyCompletionStream, 
+      (QuerySnapshot dishesSnapshot, QuerySnapshot completionSnapshot) async {
     
-    final completionData = {for (var doc in completionSnapshot.docs) doc.id: doc.data() as Map<String, dynamic>};
-    final allDishes = dishesSnapshot.docs;
-    final List<PrepTask> tasks = [];
+    final completionMap = {for (var doc in completionSnapshot.docs) doc.id: doc.data() as Map<String, dynamic>};
+    final allComponents = <String, PrepTask>{};
 
-    for (final componentDoc in componentsSnapshot.docs) {
-      final componentData = componentDoc.data() as Map<String, dynamic>;
-      final componentId = componentDoc.id;
+    for (final dishDoc in dishesSnapshot.docs) {
+      final dishName = (dishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown Dish';
+      final prepTasksSnapshot = await dishDoc.reference.collection('prepTasks').get();
 
-      // Correctly find parent dishes by checking their subcollections
-      final parentDishes = allDishes
-          .where((dishDoc) {
-            // This is a simplification. A real implementation would need to fetch the subcollection.
-            // For now, we assume the parent dish name is passed in a different way or we simulate it.
-            // This part of the logic is complex with the current structure and requires a more significant rewrite.
-            // Let's simulate finding one parent for now to fix the UI structure.
-            final prepTasks = (dishDoc.data() as Map<String, dynamic>)['prepTasks'] as List<dynamic>? ?? [];
-            return prepTasks.any((task) => (task['linkedDishRef'] as DocumentReference?)?.id == componentId);
-          })
-          .map((dishDoc) => (dishDoc.data() as Map<String, dynamic>)['dishName'] as String? ?? 'Unknown Dish')
-          .toList();
+      for (final prepTaskDoc in prepTasksSnapshot.docs) {
+        final componentData = prepTaskDoc.data();
+        final linkedDishRef = componentData['linkedDishRef'] as DocumentReference?;
 
-      final completedInfo = completionData[componentId];
-      tasks.add(PrepTask(
-        id: componentId,
-        taskName: componentData['dishName'] ?? 'Unnamed Component',
-        station: componentData['station'] ?? 'Unassigned',
-        isCompleted: completedInfo?['isCompleted'] ?? false,
-        completedBy: completedInfo?['completedBy'] as String?,
-        completedAt: (completedInfo?['completedAt'] as Timestamp?)?.toDate(),
-        parentDishes: parentDishes.isEmpty && componentData['dishName'] != null ? [componentData['dishName']!] : parentDishes, // Mock parent for UI
-        order: 0,
-      ));
+        if (linkedDishRef != null) {
+          final componentDoc = await linkedDishRef.get();
+          if (componentDoc.exists) {
+            final componentMasterData = componentDoc.data() as Map<String, dynamic>;
+            final isGloballyActive = componentMasterData['isGloballyActive'] ?? false;
+
+            if (isGloballyActive) {
+              final completedInfo = completionMap[linkedDishRef.id];
+              final existingTask = allComponents[linkedDishRef.id];
+
+              if (existingTask != null) {
+                final updatedParentDishes = List<String>.from(existingTask.parentDishes)..add(dishName);
+                allComponents[linkedDishRef.id] = existingTask.copyWith(
+                  parentDishes: updatedParentDishes,
+                  isCompleted: completedInfo?['isCompleted'] ?? false,
+                  completedBy: completedInfo?['completedBy'] as String?,
+                  completedAt: (completedInfo?['completedAt'] as Timestamp?)?.toDate(),
+                );
+              } else {
+                allComponents[linkedDishRef.id] = PrepTask(
+                  id: linkedDishRef.id,
+                  taskName: componentMasterData['dishName'] ?? 'Unnamed Component',
+                  station: componentMasterData['station'] ?? 'Unassigned',
+                  isCompleted: completedInfo?['isCompleted'] ?? false,
+                  completedBy: completedInfo?['completedBy'] as String?,
+                  completedAt: (completedInfo?['completedAt'] as Timestamp?)?.toDate(),
+                  parentDishes: [dishName],
+                  order: 0,
+                );
+              }
+            }
+          }
+        }
+      }
     }
-
-    return groupBy(tasks, (task) => task.station ?? 'Unassigned');
-  });
+    return groupBy(allComponents.values.toList(), (task) => task.station ?? 'Unassigned');
+  }).asyncMap((event) async => await event);
 });
 
 final miseEnPlaceProvider = FutureProvider.autoDispose<List<Dish>>((ref) async {

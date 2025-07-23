@@ -1,63 +1,81 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny all reads/writes
-    match /{document=**} {
-      allow read, write: if false;
+    
+    // Allow collection group queries on 'prepTasks' for any authenticated user.
+    match /{path=**}/prepTasks/{taskId} {
+      allow read: if request.auth != null;
     }
 
-    // Allow authenticated users to read/write their own user document
+    // Existing rules...
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow create: if request.auth.uid != null;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow list: if request.auth != null; // Admins need to list users
     }
-
-    // Rules for inventory items
+    
     match /inventoryItems/{itemId} {
-      allow read: if request.auth != null; // Allow any authenticated user to read
-      
-      // Allow creating new items
-      allow create: if request.auth != null;
-
-      // Allow updates only if the new quantityOnHand is not negative
-      allow update: if request.auth != null 
-                    && request.resource.data.quantityOnHand >= 0;
+      allow read, write: if request.auth != null; // Allow authenticated users to manage inventory
     }
-
-    // Allow broader access for other collections for now
-    // TODO: Secure these rules further based on application logic
-    match /dishes/{dishId}/{document=**} {
+    
+    match /suppliers/{supplierId} {
       allow read, write: if request.auth != null;
     }
-    match /dailyCompletedTasks/{dayId}/{document=**} {
+    
+    match /units/{unitId} {
       allow read, write: if request.auth != null;
     }
-    match /orderRequests/{reqId}/{document=**} {
-       allow read, write: if request.auth != null;
+    
+    match /categories/{categoryId} {
+      allow read, write: if request.auth != null;
     }
-     match /requisitions/{reqId}/{document=**} {
-       allow read, write: if request.auth != null;
+    
+    match /locations/{locationId} {
+      allow read, write: if request.auth != null;
     }
-    match /suppliers/{supId}/{document=**} {
-       allow read, write: if request.auth != null;
+
+    match /dishes/{dishId} {
+      allow read, write: if request.auth != null;
     }
-     match /units/{unitId}/{document=**} {
-       allow read, write: if request.auth != null;
+
+    match /dishes/{dishId}/prepTasks/{taskId} {
+      allow read, write: if request.auth != null;
     }
-      match /categories/{catId}/{document=**} {
-       allow read, write: if request.auth != null;
+    
+    match /dishes/{dishId}/ingredients/{ingredientId} {
+      allow read, write: if request.auth != null;
     }
-       match /locations/{locId}/{document=**} {
-       allow read, write: if request.auth != null;
+
+    match /dailyTodoLists/{date}/{collection}/{docId} {
+      allow read, write: if request.auth != null;
     }
-    match /dailyTodoLists/{listId}/{document=**} {
-        allow read, write: if request.auth != null;
+    
+    match /dailyCompletedTasks/{date}/tasks/{taskId} {
+      allow read, write: if request.auth != null;
     }
-    match /floor_checklist_items/{itemId}/{document=**} {
-        allow read, write: if request.auth != null;
+    
+    match /dailyOrderingSuggestions/{date}/suggestions/{suggestionId} {
+      allow read, write: if request.auth != null;
     }
-    match /dailyOrderingSuggestions/{dayId}/{document=**} {
-        allow read, write: if request.auth != null;
+
+    match /requisitions/{reqId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /butcher_request_items/{itemId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /floor_checklist_items/{itemId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /dailyFloorChecklists/{date} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /nextDayTasks/{date}/tasks/{taskId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

@@ -73,37 +73,36 @@ class _DishList extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (isComponent) {
-      // Temporarily disabled for cleanup.
-      // final linkedTasksQuery = await FirebaseFirestore.instance
-      //     .collectionGroup('prepTasks')
-      //     .where('linkedDishRef', isEqualTo: dishDoc.reference)
-      //     .get();
+      final linkedTasksQuery = await FirebaseFirestore.instance
+          .collectionGroup('prepTasks')
+          .where('linkedDishRef', isEqualTo: dishDoc.reference)
+          .get();
 
-      // if (linkedTasksQuery.docs.isNotEmpty) {
-      //   final List<String> parentDishNames = [];
-      //   for (final doc in linkedTasksQuery.docs) {
-      //     final parentDishDoc = await doc.reference.parent.parent!.get();
-      //     if (parentDishDoc.exists) {
-      //       parentDishNames.add((parentDishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown Dish');
-      //     }
-      //   }
+      if (linkedTasksQuery.docs.isNotEmpty) {
+        final List<String> parentDishNames = [];
+        for (final doc in linkedTasksQuery.docs) {
+          final parentDishDoc = await doc.reference.parent.parent!.get();
+          if (parentDishDoc.exists) {
+            parentDishNames.add((parentDishDoc.data() as Map<String, dynamic>)['dishName'] ?? 'Unknown Dish');
+          }
+        }
 
-      //   if (!context.mounted) return;
-      //   showDialog(
-      //     context: context,
-      //     builder: (context) => AlertDialog(
-      //       title: const Text('Cannot Delete Component'),
-      //       content: Text(
-      //           'The component "$dishName" is used in the following dishes: \n\n- ${parentDishNames.join("\n- ")}\n\nPlease remove it from these dishes first.'),
-      //       actions: [
-      //         TextButton(
-      //             child: const Text('OK'),
-      //             onPressed: () => Navigator.of(context).pop())
-      //       ],
-      //     ),
-      //   );
-      //   return;
-      // }
+        if (!context.mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cannot Delete Component'),
+            content: Text(
+                'The component "$dishName" is used in the following dishes: \n\n- ${parentDishNames.join("\n- ")}\n\nPlease remove it from these dishes first.'),
+            actions: [
+              TextButton(
+                  child: const Text('OK'),
+                  onPressed: () => Navigator.of(context).pop())
+            ],
+          ),
+        );
+        return;
+      }
     }
 
     final bool? confirmed = await showDialog<bool>(
