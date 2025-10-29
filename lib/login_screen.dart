@@ -148,14 +148,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Text(
-                    'UM',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 100,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.deepPurple.shade800,
-                      fontFamily: 'DistinctStyleSans',
+                  FittedBox(
+                    fit: BoxFit.contain,
+                    child: Text(
+                      'FLEISCH',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 100,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple.shade800,
+                        fontFamily: 'DistinctStyleSans',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
