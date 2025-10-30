@@ -37,6 +37,7 @@
     }
   ],
   "hosting": {
+    "site": "fleisch",
     "public": "build/web",
     "ignore": [
       "firebase.json",
